@@ -165,6 +165,371 @@ $f(x) = x_1^2 + 4x_1 x_2 + 3x_2^2 - 5$，$\nabla f(x) = (2x_1 + 4x_2, \; 4x_1 + 
 
 ---
 
+## Lecture 4 — GD Algorithm, Local/Global Minimum, Line Search
+
+> 📌 **考点 1: High level description of gradient descent idea**
+>
+> 📌 **考点 2 引入: Bisection search 初步**
+
+### 4.1 📌 梯度下降的完整算法
+
+输入：函数 $f: \mathbb{R}^n \to \mathbb{R}$，初始点 $x^0$。
+
+在第 $k$ 次迭代，当前点为 $x^k$，计算：
+
+$$x^{k+1} = x^k - \alpha^k \nabla f(x^k)$$
+
+**步长选择（试错法）：** 选择 $\alpha^k$，检查 $f(x^k - \alpha^k \nabla f(x^k)) < f(x^k)$？
+- 若是 → 接受该步
+- 若否 → 将 $\alpha^k$ 减半，重试
+
+### 4.2 📌 梯度计算示例
+
+$$f(x) = 4 \ln(e^{2x_1} + e^{4x_2}) - 6x_1 - 4x_2$$
+
+$$\nabla f(x) = \left( \frac{8 e^{2x_1}}{e^{2x_1} + e^{4x_2}} - 6, \quad \frac{16 e^{4x_2}}{e^{2x_1} + e^{4x_2}} - 4 \right)$$
+
+### 4.3 📌 Local Minimum vs Global Minimum
+
+- **全局最小值** $x^{\ast}$：$f(x^{\ast}) \leq f(x)$ 对所有 $x$ 成立
+- **局部最小值** $\hat{x}$：$f(\hat{x}) \leq f(x)$ 对 $\hat{x}$ 的小邻域内所有 $x$ 成立
+
+**梯度下降的最好期望是到达一个局部最小值。**
+
+### 4.4 凸函数保证局部即全局
+
+如果目标函数是**凸函数**，则局部最小值和全局最小值没有区别——所有局部最小值都是全局最小值。
+
+当目标函数不是凸的时，启发式方法是从**不同初始点**多次运行 GD。
+
+### 4.5 📌 精确线搜索 (Exact Line Search)
+
+当前在点 $x^k$，已算出 $\nabla f(x^k)$。选择步长使下一步函数值尽可能小：
+
+$$\min_{\alpha \geq 0} f\left(x^k - \alpha \, \nabla f(x^k)\right)$$
+
+这是一个关于 $\alpha$ 的**单维优化问题** (single-dimensional optimization)。
+
+### 4.6 📌 单维优化与区间缩减
+
+给定函数 $f: \mathbb{R} \to \mathbb{R}$，从初始不确定区间 $[a^1, b^1]$ 出发，通过迭代缩小区间逼近最小值点。
+
+**区间更新规则：** 取两个试探点 $\lambda^k$（左）和 $\rho^k$（右）：
+- 若 $f(\lambda^k) \leq f(\rho^k)$：$a^{k+1} = a^k$，$b^{k+1} = \rho^k$（丢弃右边）
+- 若 $f(\lambda^k) > f(\rho^k)$：$a^{k+1} = \lambda^k$，$b^{k+1} = b^k$（丢弃左边）
+
+### 4.7 📌 Bisection Search 初步
+
+将 $\lambda^k$ 和 $\rho^k$ 对称放置在中点两侧：
+
+$$\lambda^k = \frac{a^k + b^k}{2} - \varepsilon, \qquad \rho^k = \frac{a^k + b^k}{2} + \varepsilon$$
+
+$\varepsilon$ 太小 → 数值比较困难；$\varepsilon$ 太大 → 区间缩减慢。
+
+---
+
+## Lecture 5 — Bisection Search & Golden Section Search
+
+> 📌 **考点 2: Bisection and golden section search for single dimensional optimization**
+
+### 5.1 📌 Bisection Search 完整算法
+
+① 选择初始不确定区间 $(a^1, b^1)$，停止容差 $\theta$，令 $k = 1$。
+
+② 设：
+$$\lambda^k = \frac{a^k + b^k}{2} - \varepsilon, \qquad \rho^k = \frac{a^k + b^k}{2} + \varepsilon$$
+
+③ 若 $f(\lambda^k) \leq f(\rho^k)$，则 $a^{k+1} = a^k$，$b^{k+1} = \rho^k$。
+　若 $f(\lambda^k) > f(\rho^k)$，则 $a^{k+1} = \lambda^k$，$b^{k+1} = b^k$。
+
+④ 若 $b^{k+1} - a^{k+1} \leq \theta$ 则停止。否则 $k \leftarrow k+1$，回到 ②。
+
+**每次迭代需要 2 次函数评估。**
+
+### 5.2 📌 Golden Section Search 推导
+
+**核心问题：** 能否让每次迭代只需 1 次函数评估？
+
+**思路：** 让 $\lambda^{k+1}$ 与 $\rho^k$ 重合（或 $\rho^{k+1}$ 与 $\lambda^k$ 重合），同时要求区间每次缩减同一比例 $\beta$：
+
+$$b^{k+1} - a^{k+1} = \beta \cdot (b^k - a^k)$$
+
+由此推导出：
+$$\lambda^k = \beta \cdot a^k + (1-\beta) \cdot b^k, \qquad \rho^k = (1-\beta) \cdot a^k + \beta \cdot b^k$$
+
+**对齐条件：** 要求 $\rho^k = \lambda^{k+1}$（当情况 ★ 发生时），代入化简：
+
+$$(1-\beta)(a^k - b^k) = \beta^2(a^k - b^k) \implies 1 - \beta = \beta^2$$
+
+$$\beta^2 + \beta - 1 = 0 \implies \beta = \frac{-1 + \sqrt{5}}{2} \approx 0.618$$
+
+情况 ★★ 同理得到相同的 $\beta$。
+
+### 5.3 📌 Golden Section Search 完整算法
+
+① 选择 $(a^1, b^1)$，停止容差 $\theta$，令 $k = 1$。
+
+② 设 $\lambda^k = \beta \cdot a^k + (1-\beta) \cdot b^k$，$\rho^k = (1-\beta) \cdot a^k + \beta \cdot b^k$，其中 $\beta = \frac{-1+\sqrt{5}}{2}$。
+
+③ 若 $f(\lambda^k) \leq f(\rho^k)$，则 $a^{k+1} = a^k$，$b^{k+1} = \rho^k$。
+　若 $f(\lambda^k) > f(\rho^k)$，则 $a^{k+1} = \lambda^k$，$b^{k+1} = b^k$。
+
+④ 若 $b^{k+1} - a^{k+1} \leq \theta$ 则停止。否则 $k \leftarrow k+1$，回到 ②。
+
+**关键：** 每次迭代只需 1 次新函数评估（复用上一轮的另一个点）。区间每次缩减为原来的 $\beta \approx 0.618$ 倍。
+
+### 5.4 📌 基于导数的单维优化
+
+若可以计算 $f'$，则在区间中点求导：
+- $f'((a^k+b^k)/2) \leq 0$（函数递减）→ 最小值在右半：$a^{k+1} = (a^k+b^k)/2$，$b^{k+1} = b^k$
+- $f'((a^k+b^k)/2) > 0$（函数递增）→ 最小值在左半：$a^{k+1} = a^k$，$b^{k+1} = (a^k+b^k)/2$
+
+每次迭代区间减半，效率更高。
+
+---
+
+## Lecture 6 — Line Search for GD Step Size & Penalty Function Method
+
+> 📌 **考点 2: 用 Bisection 做 GD 步长搜索**
+>
+> 📌 **考点 3: Penalty function method**
+
+### 6.1 📌 用单维优化选择 GD 步长
+
+GD 第 $k$ 步在点 $x^k$，需求解：
+
+$$\min_{\alpha \geq 0} f\left(x^k - \alpha \, \nabla f(x^k)\right)$$
+
+$x^k$ 和 $\nabla f(x^k)$ 已知，这是关于 $\alpha$ 的单维优化问题。可以用 bisection search 或 golden section search 求解。
+
+### 6.2 📌 约束优化问题
+
+$$\min \quad f(x) \qquad \text{s.t.} \quad g_1(x) \leq 0, \ldots, g_n(x) \leq 0, \quad h_1(x) = 0, \ldots, h_m(x) = 0$$
+
+**基本策略：** 将约束优化转化为无约束优化，再用标准 GD 求解。
+
+### 6.3 📌 Penalty Function Method
+
+**核心思想：** 将约束违反程度作为惩罚项加入目标函数。
+
+$$\min_x \quad f(x) + \sum_{i=1}^{n} \theta_i \left(\max\lbrace 0, g_i(x)\rbrace\right)^2 + \sum_{i=1}^{m} \gamma_i \left(h_i(x)\right)^2$$
+
+其中 $\theta_1, \ldots, \theta_n, \gamma_1, \ldots, \gamma_m$ 为大的惩罚参数。
+
+**为什么对不等式约束取平方？** $\max\lbrace 0, g(x)\rbrace$ 在零点处不可微，但 $(\max\lbrace 0, g(x)\rbrace)^2$ 是光滑的，可以用 GD。
+
+### 6.4 📌 Penalty Function Method 完整算法
+
+① 选择初始惩罚参数 $\theta_1, \ldots, \theta_n$，$\gamma_1, \ldots, \gamma_m$，容差 $\varepsilon$，放大因子 $\beta > 1$，令 $k = 1$。
+
+② 求解无约束问题：
+
+$$x^k = \arg\min_x \left\lbrace f(x) + \sum_{i=1}^{n} \theta_i^k \left(\max\lbrace 0, g_i(x)\rbrace\right)^2 + \sum_{i=1}^{m} \gamma_i^k \left(h_i(x)\right)^2 \right\rbrace$$
+
+③ 若 $\sum_{i=1}^{n} \theta_i^k (\max\lbrace 0, g_i(x^k)\rbrace)^2 + \sum_{i=1}^{m} \gamma_i^k (h_i(x^k))^2 \leq \varepsilon$，则停止。
+
+否则 $\theta_i^{k+1} = \beta \, \theta_i^k$，$\gamma_i^{k+1} = \beta \, \gamma_i^k$，$k \leftarrow k+1$，回到 ②。
+
+**例子：** $\min (x_1-2)^4 + (x_1-2x_2)^2$ s.t. $x_1^2 - x_2 \leq 0$
+
+---
+
+## Lecture 7 — Barrier Function Method & Taylor's Theorem
+
+> 📌 **考点 3: Barrier function method**
+>
+> 📌 **考点 4: Taylor's theorem and its implication**
+
+### 7.1 📌 Barrier Function Method
+
+**适用范围：** 仅限不等式约束问题。
+
+$$\min \quad f(x) \qquad \text{s.t.} \quad g_1(x) \leq 0, \ldots, g_n(x) \leq 0$$
+
+**核心思想：** 在可行域边界处设置"障碍墙"——当接近边界时 $g_i(x) \to 0^-$，$-1/g_i(x) \to +\infty$：
+
+$$\min_x \quad f(x) - \sum_{i=1}^{n} \mu_i \frac{1}{g_i(x)}$$
+
+其中 $\mu_1, \ldots, \mu_n$ 为小的 barrier 参数。
+
+### 7.2 📌 Barrier Function Method 完整算法
+
+① 选择初始 barrier 参数 $\mu_1, \ldots, \mu_n$，容差 $\varepsilon$，缩减因子 $\beta \in (0,1)$，令 $k = 1$。选择 $x^0$ 严格在可行域内部（$g_i(x^0) < 0$）。
+
+② 从 $x^{k-1}$ 出发，用 GD 求解：
+
+$$x^k = \arg\min_x \left\lbrace f(x) - \sum_{i=1}^{n} \mu_i^k \frac{1}{g_i(x)} \right\rbrace$$
+
+③ 若 $-\sum_{i=1}^{n} \mu_i^k \frac{1}{g_i(x^k)} \leq \varepsilon$，则停止。否则 $\mu_i^{k+1} = \beta \, \mu_i^k$，$k \leftarrow k+1$，回到 ②。
+
+**Penalty vs Barrier 对比：**
+
+| 特性 | Penalty Method | Barrier Method |
+|------|---------------|----------------|
+| 约束类型 | 等式 + 不等式 | 仅不等式 |
+| 初始点 | 任意 | 必须严格可行 |
+| 参数变化 | 增大（$\beta > 1$） | 缩小（$\beta \in (0,1)$） |
+| 迭代点 | 可能不可行 | 始终严格可行 |
+
+### 7.3 📌 小 $o$ 记号
+
+$g(t)$ 是 $o(t)$ 函数，如果：
+
+$$\lim_{t \to 0} \frac{g(t)}{t} = 0$$
+
+**例子：**
+- $g(t) = t^2$：$\lim_{t\to 0} t^2/t = 0$ → ✓ 是 $o(t)$
+- $g(t) = 2t$：$\lim_{t\to 0} 2t/t = 2$ → ✗ 不是 $o(t)$
+- $g(t) = \sqrt{t}$：$\lim_{t\to 0} \sqrt{t}/t = \infty$ → ✗ 不是 $o(t)$
+
+**直观理解：** $o(t)$ 表示"比 $t$ 趋于 0 更快的函数"——即 $t^2, t^3, t^{3/2}$ 等。
+
+### 7.4 📌 Taylor's Theorem
+
+设 $f: \mathbb{R}^n \to \mathbb{R}$ 无穷可微，则：
+
+$$f(y) = f(x) + \nabla^{\top} f\left(\gamma x + (1-\gamma)y\right) \cdot (y - x)$$
+
+其中 $\gamma \in (0, 1)$。
+
+这本质上是**多维中值定理**：存在 $x$ 和 $y$ 之间的某个中间点，其梯度的投影等于函数值之差。
+
+---
+
+## Lecture 8 — Taylor's Theorem Implication & Convex Functions
+
+> 📌 **考点 4: Taylor's theorem and its implication**
+>
+> 📌 **考点 5: Definition of a convex function**
+
+### 8.1 📌 Taylor 定理的推论（Implication）
+
+$$f(y) = f(x) + \nabla^{\top} f(x) \cdot (y - x) + o(\lVert y - x \rVert)$$
+
+**证明：** 由 Taylor 定理：
+
+$$f(y) = f(x) + \nabla^{\top} f(\gamma x + (1-\gamma)y) \cdot (y-x)$$
+
+$$= f(x) + \nabla^{\top} f(x) \cdot (y-x) + \underbrace{\left(\nabla^{\top} f(\gamma x + (1-\gamma)y) - \nabla^{\top} f(x)\right)(y-x)}_{(\star)}$$
+
+其中 $(\star)$ 需证明为 $o(\lVert y-x \rVert)$。
+
+用内积展开：
+
+$$= f(x) + \nabla^{\top} f(x)(y-x) + \lVert \nabla f(\gamma x + (1-\gamma)y) - \nabla f(x) \rVert \cdot \lVert y-x \rVert \cdot \cos\phi$$
+
+验证 $o(\lVert y-x \rVert)$：
+
+$$\lim_{\lVert y-x \rVert \to 0} \frac{\lVert \nabla f(\gamma x + (1-\gamma)y) - \nabla f(x) \rVert \cdot \lVert y-x \rVert \cdot \cos\phi}{\lVert y-x \rVert} = 0$$
+
+因为 $\lVert y-x \rVert \to 0$ 时 $\gamma x + (1-\gamma)y \to x$，故梯度差 $\to 0$。$\blacksquare$
+
+### 8.2 📌 Taylor 推论的重要应用：GD 使函数值下降
+
+设 $\nabla f(\hat{x}) \neq 0$，则存在足够小的 $\alpha > 0$ 使得 $f(\hat{x} - \alpha \nabla f(\hat{x})) < f(\hat{x})$。
+
+**证明：** 令 $y = \hat{x} - \alpha \nabla f(\hat{x})$，由推论：
+
+$$f(\hat{x} - \alpha \nabla f(\hat{x})) = f(\hat{x}) - \alpha \lVert \nabla f(\hat{x}) \rVert^2 + o(\alpha \lVert \nabla f(\hat{x}) \rVert)$$
+
+$$= f(\hat{x}) + \alpha \lVert \nabla f(\hat{x}) \rVert \left(-\lVert \nabla f(\hat{x}) \rVert + \frac{o(\alpha \lVert \nabla f(\hat{x}) \rVert)}{\alpha \lVert \nabla f(\hat{x}) \rVert}\right)$$
+
+因为 $\lim_{\alpha \to 0} \frac{o(\alpha \lVert \nabla f(\hat{x}) \rVert)}{\alpha \lVert \nabla f(\hat{x}) \rVert} = 0$，可选 $\alpha$ 足够小使：
+
+$$\frac{o(\alpha \lVert \nabla f(\hat{x}) \rVert)}{\alpha \lVert \nabla f(\hat{x}) \rVert} \leq \frac{1}{2}\lVert \nabla f(\hat{x}) \rVert$$
+
+代入得：
+
+$$f(\hat{x} - \alpha \nabla f(\hat{x})) \leq f(\hat{x}) - \frac{1}{2}\alpha \lVert \nabla f(\hat{x}) \rVert^2 < f(\hat{x}) \quad \blacksquare$$
+
+### 8.3 📌 凸函数的定义
+
+$f: \mathbb{R}^n \to \mathbb{R}$ 是凸的，当且仅当：
+
+$$f(\lambda x + (1-\lambda)y) \leq \lambda f(x) + (1-\lambda)f(y) \quad \forall\, x,y \in \mathbb{R}^n,\; \lambda \in [0,1]$$
+
+**几何含义：** 函数曲线上任意两点的连线段（弦）在函数曲线的**上方**。
+
+### 8.4 📌 Jensen 不等式
+
+设 $f$ 凸，$x^1, \ldots, x^k \in \mathbb{R}^n$，$\lambda^1, \ldots, \lambda^k \geq 0$，$\sum_{\ell=1}^{k} \lambda^\ell = 1$，则：
+
+$$f\left(\sum_{\ell=1}^{k} \lambda^\ell x^\ell\right) \leq \sum_{\ell=1}^{k} \lambda^\ell f(x^\ell)$$
+
+**证明思路：** 反复使用凸函数的二点定义。将 $\sum_{\ell=1}^{k} \lambda^\ell x^\ell$ 写成 $\lambda^1 x^1 + (1-\lambda^1) \cdot$ [其余的凸组合]，然后递归展开。
+
+---
+
+## Lecture 9 — First-Order Characterization of Convexity & Local = Global
+
+> 📌 **考点 5: Definition of a convex function**（续）
+>
+> 📌 **考点 6: First order characterization of convexity**
+
+### 9.1 📌 一阶特征化定理（First-Order Characterization）
+
+$f: \mathbb{R}^n \to \mathbb{R}$ 凸，当且仅当：
+
+$$f(y) \geq f(x) + \nabla^{\top} f(x) \cdot (y - x) \quad \forall\, x, y \in \mathbb{R}^n$$
+
+**几何含义：** 凸函数在任意点的切线（一阶 Taylor 近似）是函数的**全局下界**。
+
+### 9.2 📌 证明（⟹ 方向：凸 → 一阶条件）
+
+设 $f$ 凸，由凸性：
+
+$$f(x + \lambda(y-x)) \leq (1-\lambda)f(x) + \lambda f(y)$$
+
+$$\implies f(y) \geq f(x) + \frac{f(x + \lambda(y-x)) - f(x)}{\lambda}$$
+
+由 Taylor 推论展开分子：
+
+$$= f(x) + \frac{\nabla^{\top} f(x) \cdot \lambda(y-x) + o(\lambda\lVert y-x \rVert)}{\lambda}$$
+
+$$= f(x) + \nabla^{\top} f(x)(y-x) + \frac{o(\lambda\lVert y-x \rVert)}{\lambda\lVert y-x \rVert} \cdot \lVert y-x \rVert$$
+
+对所有 $\lambda \in (0,1)$ 成立，令 $\lambda \to 0$，余项趋于 0：
+
+$$f(y) \geq f(x) + \nabla^{\top} f(x)(y-x) \quad \blacksquare$$
+
+### 9.3 📌 证明（⟸ 方向：一阶条件 → 凸）
+
+取任意 $a, b \in \mathbb{R}^n$，$\lambda \in [0,1]$，令 $c = \lambda a + (1-\lambda)b$。
+
+由一阶条件分别以 $c$ 为切点：
+
+$$f(a) \geq f(c) + \nabla^{\top} f(c) \cdot (a - c) \qquad \times \lambda$$
+
+$$f(b) \geq f(c) + \nabla^{\top} f(c) \cdot (b - c) \qquad \times (1-\lambda)$$
+
+两式加权求和：
+
+$$\lambda f(a) + (1-\lambda)f(b) \geq f(c) + \nabla^{\top} f(c) \cdot \underbrace{[\lambda(a-c) + (1-\lambda)(b-c)]}_{= \lambda a + (1-\lambda)b - c = 0}$$
+
+$$= f(c) = f(\lambda a + (1-\lambda)b) \quad \blacksquare$$
+
+### 9.4 📌 局部最小值 = 全局最小值（凸函数）
+
+**定理：** 设 $f: \mathbb{R}^n \to \mathbb{R}$ 凸，$\hat{x}$ 是 $f$ 的局部最小值，则 $\hat{x}$ 是全局最小值。
+
+**证明：** 对任意 $y \in \mathbb{R}^n$，因为 $\hat{x}$ 是局部最小，存在 $\varepsilon > 0$ 使得 $f(\hat{x}) \leq f(z)$ 对 $\lVert z - \hat{x} \rVert \leq \varepsilon$ 成立。
+
+选 $\lambda$ 使得 $(1-\lambda)\lVert y - \hat{x} \rVert \leq \varepsilon$，则 $\lambda\hat{x} + (1-\lambda)y$ 在 $\hat{x}$ 的 $\varepsilon$-邻域内：
+
+$$f(\hat{x}) \leq f(\lambda\hat{x} + (1-\lambda)y) \leq \lambda f(\hat{x}) + (1-\lambda)f(y)$$
+
+$$\implies (1-\lambda)f(\hat{x}) \leq (1-\lambda)f(y) \implies f(\hat{x}) \leq f(y) \quad \blacksquare$$
+
+### 9.5 📌 梯度为零 → 全局最小
+
+**定理：** 设 $f$ 凸，若 $\nabla f(\hat{x}) = 0$，则 $\hat{x}$ 是全局最小值。
+
+**证明：** 对任意 $y$，由一阶特征化：
+
+$$f(y) \geq f(\hat{x}) + \underbrace{\nabla^{\top} f(\hat{x})}_{= 0} \cdot (y - \hat{x}) = f(\hat{x}) \quad \blacksquare$$
+
+---
+
 # Typical Exam Questions
 
 ## Code & Excel
