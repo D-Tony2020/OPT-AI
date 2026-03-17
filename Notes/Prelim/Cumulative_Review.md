@@ -19,6 +19,89 @@
 | iPad notes | Must be printed; iPads not allowed during exam |
 | Calculator | Non-communicating calculator allowed, but numbers will be easy enough without one |
 
+## Specific Exam Topics
+
+1. High level description of gradient descent idea
+2. Bisection and golden section search for single dimensional optimization
+3. Penalty function method, barrier function method
+4. Taylor's theorem and its implication
+5. Definition of a convex function
+6. First order characterization of convexity
+7. Convergence of gradient descent with fixed step size for functions with bounded gradients
+8. Preliminary analysis / convergence of gradient descent with fixed step size for smooth convex functions
+9. Convex sets
+
+## Professor's Exam Hints
+
+**Problem 1 (Committed)**:
+- "I'm going to give you a function. And I'm going to ask you, start from this point and do two iterations of gradient descent, like manually."
+- Numbers will be easy — no calculator needed
+- May choose step size by bisection or golden section
+- Could be gradient descent on a penalized objective function (penalty function method)
+
+**Problems 2 & 3 (Roughly)**:
+- "Show that in this type of situation, if you give me a convex function, it's still going to be a convex function type of derivations."
+- Small pieces of convergence analysis, like HW3 Q3
+- "I would never ask you a proof along those lines, like a full-blown proof, but I may ask for a small little piece."
+
+**Other Notes**:
+- Basic algebraic factorizations expected (e.g., $x^2 - y^2 = (x-y)(x+y)$), but not polynomial long division
+- Can ask the professor during the exam if a shortcut/theorem is allowed (e.g., "sum of convex functions is convex")
+- Small step size definition: output of bisection/golden section search (layperson optimization), or $\gamma = \frac{R}{B\sqrt{K}}$ (fixed step size analysis)
+
+## Review Session Practice Problem
+
+> This is highly exam-relevant — the professor demonstrated this as the exact type of Problem 1.
+
+**Problem:** Minimize $e^{x_1} + 100(x_2 + 2)^2$ subject to $x_1 + x_2 \leq 10$, $x_1 \geq 7$.
+
+Use penalty parameters $\theta_1 = \theta_2 = 100$. Start from initial point $x^0 = (5, 6)$. Do one iteration of gradient descent with step size $\gamma = 0.01$.
+
+**Step 1: Rewrite constraints as $g(x) \leq 0$**
+
+$$g_1(x) = 10 - x_1 - x_2 \leq 0$$
+
+$$g_2(x) = 7 - x_1 \leq 0$$
+
+**Step 2: Write penalized objective function**
+
+$$h(x) = e^{x_1} + 100(x_2 + 2)^2 + \theta_1 \cdot (\max\lbrace g_1(x), 0\rbrace)^2 + \theta_2 \cdot (\max\lbrace g_2(x), 0\rbrace)^2$$
+
+**Step 3: Determine which penalty terms are active at $(5, 6)$**
+
+- $g_1(5, 6) = 10 - 5 - 6 = -1 \leq 0$ → constraint satisfied, penalty term = 0
+- $g_2(5, 6) = 7 - 5 = 2 > 0$ → constraint violated, penalty term active
+
+**Step 4: Simplify $h(x)$ around neighborhood of $(5, 6)$**
+
+Around a small neighborhood of $(5, 6)$:
+
+$$h(x) \approx e^{x_1} + 100(x_2 + 2)^2 + 100(7 - x_1)^2$$
+
+**Step 5: Compute gradient of $h$ at $(5, 6)$**
+
+$$\nabla h(x) = \begin{pmatrix} e^{x_1} - 200(7 - x_1) \\ 200(x_2 + 2) \end{pmatrix}$$
+
+$$\nabla h(5, 6) = \begin{pmatrix} e^5 - 200(7 - 5) \\ 200(6 + 2) \end{pmatrix} = \begin{pmatrix} e^5 - 400 \\ 1600 \end{pmatrix} \approx \begin{pmatrix} -251.57 \\ 1600 \end{pmatrix}$$
+
+**Step 6: One iteration of gradient descent**
+
+$$x^1 = x^0 - \gamma \nabla h(x^0) = \begin{pmatrix} 5 \\ 6 \end{pmatrix} - 0.01 \begin{pmatrix} -251.57 \\ 1600 \end{pmatrix} = \begin{pmatrix} 7.5157 \\ -10 \end{pmatrix}$$
+
+**Important Note (If doing a second iteration):**
+
+At the new point $(7.5157, -10)$:
+- $g_1 = 10 - 7.5157 - (-10) = 12.49 > 0$ → **first constraint now violated**, this penalty term becomes active
+- $g_2 = 7 - 7.5157 = -0.5157 \leq 0$ → second constraint now satisfied, penalty term = 0
+
+So the penalized objective around $(7.5157, -10)$ changes to:
+
+$$h(x) \approx e^{x_1} + 100(x_2 + 2)^2 + 100(10 - x_1 - x_2)^2$$
+
+Which penalty terms survive depends on which point we're sitting at.
+
+---
+
 # Course Content Review (Lec 1–12)
 
 本章按 Lecture 顺序复习 ORIE 5320 的全部课程内容（Lec 1–12）。每个 Lecture 开头标注其覆盖的考点编号。考点内容用 📌 标记，非考点内容用 [非考点] 标记。
@@ -530,11 +613,257 @@ $$f(y) \geq f(\hat{x}) + \underbrace{\nabla^{\top} f(\hat{x})}_{= 0} \cdot (y - 
 
 ---
 
+## Lecture 10 — GD Convergence: Bounded Gradients
+
+> 📌 **考点 7: Convergence of gradient descent with fixed step size for functions with bounded gradients**
+
+### 10.1 📌 问题设置
+
+最小化凸函数 $f: \mathbb{R}^n \to \mathbb{R}$，使用常步长 $\gamma$ 的 GD：
+
+$$x^{k+1} = x^k - \gamma \, \nabla f(x^k) = x^k - \gamma \, g^k$$
+
+其中 $g^k = \nabla f(x^k)$，$x^{\ast}$ 为全局最小点。
+
+**常步长的局限：** 无法收敛到最小值，只能在最小值附近**弹跳** (bounce)。
+
+**例子：** $f(x) = (x-1)^2$，$x^0 = 2$，$\gamma = 1$：
+- $x^1 = 2 - 1 \cdot 2(2-1) = 0$
+- $x^2 = 0 - 1 \cdot 2(0-1) = 2$
+- $x^3 = 0, x^4 = 2, \ldots$ → 在 $x^{\ast} = 1$ 两侧弹跳
+
+### 10.2 📌 预备分析 (Preliminary Analysis)
+
+**有用等式：**
+
+$$\lVert x - y \rVert^2 = \lVert x \rVert^2 + \lVert y \rVert^2 - 2x^{\top} y$$
+
+**关键推导步骤：**
+
+**Step 1：** 由一阶特征化：$f(x^{\ast}) \geq f(x^k) + (g^k)^{\top}(x^{\ast} - x^k)$，故：
+
+$$f(x^k) - f(x^{\ast}) \leq (g^k)^{\top}(x^k - x^{\ast}) \qquad (\star)$$
+
+**Step 2：** 由 GD 规则 $g^k = \frac{1}{\gamma}(x^k - x^{k+1})$，展开内积：
+
+$$(g^k)^{\top}(x^k - x^{\ast}) = \frac{1}{\gamma}(x^k - x^{k+1})^{\top}(x^k - x^{\ast})$$
+
+$$= \frac{1}{2\gamma}\left(\lVert x^k - x^{k+1} \rVert^2 + \lVert x^k - x^{\ast} \rVert^2 - \lVert x^{k+1} - x^{\ast} \rVert^2\right)$$
+
+$$= \frac{\gamma}{2}\lVert g^k \rVert^2 + \frac{1}{2\gamma}\left(\lVert x^k - x^{\ast} \rVert^2 - \lVert x^{k+1} - x^{\ast} \rVert^2\right)$$
+
+**Step 3：** 对 $k = 0, 1, \ldots, K-1$ 求和（**伸缩和** telescoping sums）：
+
+$$\sum_{k=0}^{K-1}(g^k)^{\top}(x^k - x^{\ast}) = \frac{\gamma}{2}\sum_{k=0}^{K-1}\lVert g^k \rVert^2 + \frac{1}{2\gamma}\left(\lVert x^0 - x^{\ast} \rVert^2 - \lVert x^K - x^{\ast} \rVert^2\right)$$
+
+$$\leq \frac{\gamma}{2}\sum_{k=0}^{K-1}\lVert g^k \rVert^2 + \frac{1}{2\gamma}\lVert x^0 - x^{\ast} \rVert^2$$
+
+**Step 4：** 由 $(\star)$ 代入得：
+
+$$\sum_{k=0}^{K-1}\left(f(x^k) - f(x^{\ast})\right) \leq \frac{\gamma}{2}\sum_{k=0}^{K-1}\lVert g^k \rVert^2 + \frac{1}{2\gamma}\lVert x^0 - x^{\ast} \rVert^2$$
+
+**直觉解读：**
+- $\gamma$ 太小 → 被 $\frac{1}{2\gamma}\lVert x^0 - x^{\ast} \rVert^2$ 主导（步太小，卡在初始点附近）
+- $\gamma$ 太大 → 被 $\frac{\gamma}{2}\sum\lVert g^k \rVert^2$ 主导（步太大，不断过冲）
+
+### 10.3 📌 收敛定理（有界梯度）
+
+**定理：** 设 $f$ 凸，$\lVert \nabla f(x) \rVert \leq B$ 对所有 $x$ 成立，$\lVert x^0 - x^{\ast} \rVert = R$。若选步长：
+
+$$\gamma = \frac{R}{B\sqrt{K}}$$
+
+则 $K$ 次迭代后：
+
+$$\frac{1}{K}\sum_{k=0}^{K-1}\left(f(x^k) - f(x^{\ast})\right) \leq \frac{RB}{\sqrt{K}}$$
+
+**证明：** 由预备分析结果，代入 $\lVert g^k \rVert \leq B$：
+
+$$\sum_{k=0}^{K-1}(f(x^k) - f(x^{\ast})) \leq \frac{\gamma}{2}KB^2 + \frac{R^2}{2\gamma}$$
+
+最优化步长 $\gamma$：令 $H'(\gamma) = \frac{1}{2}(KB^2 - R^2/\gamma^2) = 0$，得 $\gamma = R/(B\sqrt{K})$。
+
+代入：$\sum(f(x^k) - f(x^{\ast})) \leq RB\sqrt{K}$
+
+除以 $K$：$\frac{1}{K}\sum(f(x^k) - f(x^{\ast})) \leq RB/\sqrt{K}$ $\blacksquare$
+
+**收敛速率：** $O(1/\sqrt{K})$。迭代复杂度：要达精度 $\varepsilon$，需 $K = (RB/\varepsilon)^2$ 次迭代。
+
+---
+
+## Lecture 11 — GD Convergence: Smooth Convex Functions
+
+> 📌 **考点 8: Preliminary analysis / convergence of gradient descent with fixed step size for smooth convex functions**
+
+### 11.1 📌 光滑凸函数的定义
+
+**定义：** 凸函数 $f: \mathbb{R}^n \to \mathbb{R}$ 是**光滑的** (smooth)，参数为 $L$，如果：
+
+$$f(y) \leq f(x) + \nabla f(x)^{\top}(y-x) + \frac{L}{2}\lVert y-x \rVert^2 \quad \forall\, x, y \in \mathbb{R}^n$$
+
+**直观理解：** 光滑凸函数被夹在：
+- **下界：** 切线（一阶近似）$f(x) + \nabla f(x)^{\top}(y-x)$（一阶特征化）
+- **上界：** 二次近似 $f(x) + \nabla f(x)^{\top}(y-x) + \frac{L}{2}\lVert y-x \rVert^2$
+
+### 11.2 📌 预备结论 1：GD 单步下降量
+
+设 $f$ 光滑（参数 $L$），步长 $\gamma$ 的 GD 满足：
+
+$$f(x^{k+1}) \leq f(x^k) - \gamma\left(1 - \frac{\gamma L}{2}\right)\lVert g^k \rVert^2$$
+
+**证明：** 由光滑性定义（令 $y = x^{k+1} = x^k - \gamma g^k$）：
+
+$$f(x^{k+1}) \leq f(x^k) + (g^k)^{\top}(-\gamma g^k) + \frac{L}{2}\gamma^2\lVert g^k \rVert^2 = f(x^k) - \gamma\left(1 - \frac{L\gamma}{2}\right)\lVert g^k \rVert^2 \quad \blacksquare$$
+
+**特别地，取 $\gamma = 1/L$：**
+
+$$f(x^{k+1}) \leq f(x^k) - \frac{1}{2L}\lVert g^k \rVert^2$$
+
+这意味着 $f(x^0) \geq f(x^1) \geq f(x^2) \geq \cdots$（函数值单调递减）。
+
+### 11.3 📌 预备结论 2（复用 Lecture 10 的预备分析）
+
+$$\sum_{k=0}^{K-1}(f(x^k) - f(x^{\ast})) \leq \frac{\gamma}{2}\sum_{k=0}^{K-1}\lVert g^k \rVert^2 + \frac{1}{2\gamma}\lVert x^0 - x^{\ast} \rVert^2$$
+
+### 11.4 📌 收敛定理（光滑凸函数）
+
+**定理：** 设 $f: \mathbb{R}^n \to \mathbb{R}$ 光滑凸（参数 $L$），$\lVert x^0 - x^{\ast} \rVert \leq R$。取步长 $\gamma = 1/L$，则：
+
+$$f(x^K) - f(x^{\ast}) \leq \frac{LR^2}{2K}$$
+
+**证明：**
+
+由结论 1：$\frac{1}{2L}\lVert g^k \rVert^2 \leq f(x^k) - f(x^{k+1})$
+
+对 $k = 0, \ldots, K-1$ 求和（telescoping）：
+
+$$\frac{1}{2L}\sum_{k=0}^{K-1}\lVert g^k \rVert^2 \leq f(x^0) - f(x^K) \qquad (\ast)$$
+
+由结论 2（取 $\gamma = 1/L$）：
+
+$$\sum_{k=0}^{K-1}(f(x^k) - f(x^{\ast})) \leq \frac{1}{2L}\sum_{k=0}^{K-1}\lVert g^k \rVert^2 + \frac{L}{2}R^2$$
+
+由 $(\ast)$ 代入：
+
+$$\sum_{k=0}^{K-1}(f(x^k) - f(x^{\ast})) \leq f(x^0) - f(x^K) + \frac{L}{2}R^2$$
+
+整理：
+
+$$\sum_{k=1}^{K}(f(x^k) - f(x^{\ast})) \leq \frac{L}{2}R^2$$
+
+由结论 1，$f(x^K)$ 是最小的，故：
+
+$$f(x^K) - f(x^{\ast}) \leq \frac{1}{K}\sum_{k=1}^{K}(f(x^k) - f(x^{\ast})) \leq \frac{LR^2}{2K} \quad \blacksquare$$
+
+### 11.5 📌 迭代复杂度与渐近收敛
+
+**迭代复杂度：** 要达精度 $\varepsilon$：
+
+$$K = \frac{LR^2}{2\varepsilon}$$
+
+对比有界梯度情形 $K = (RB/\varepsilon)^2$，光滑凸函数收敛**快得多**（$O(1/K)$ vs $O(1/\sqrt{K})$）。
+
+**渐近收敛：**
+
+$$0 \leq f(x^K) - f(x^{\ast}) \leq \frac{LR^2}{2K} \xrightarrow{K \to \infty} 0$$
+
+$$\implies \lim_{K \to \infty} f(x^K) = f(x^{\ast})$$
+
+长时间运行 GD，最后一个迭代点的函数值可以任意接近最优值。
+
+---
+
+## Lecture 12 — Convex Sets & Projected Gradient Descent
+
+> 📌 **考点 9: Convex sets**
+>
+> [非考点] Projected Gradient Descent（不考，但了解概念）
+
+### 12.1 📌 凸集的定义
+
+$C \subseteq \mathbb{R}^n$ 是凸集，当且仅当：
+
+$$\forall\, x, y \in C,\; \lambda \in [0,1]: \quad \lambda x + (1-\lambda)y \in C$$
+
+**直观理解：** 凸集内任意两点的连线段完全在集合内部——从任一点到任一点都有"直接视线"。
+
+### 12.2 📌 凸集的交仍是凸集
+
+**定理：** 若 $C_1, C_2, \ldots, C_\ell$ 均为凸集，则 $C_1 \cap C_2 \cap \cdots \cap C_\ell$ 也是凸集。
+
+**证明：** 取 $x, y \in C_1 \cap \cdots \cap C_\ell$，$\lambda \in [0,1]$。
+
+对每个 $i$：$x \in C_i$ 且 $y \in C_i$，因为 $C_i$ 凸，故 $\lambda x + (1-\lambda)y \in C_i$。
+
+对所有 $i$ 均成立，故 $\lambda x + (1-\lambda)y \in C_1 \cap \cdots \cap C_\ell$。$\blacksquare$
+
+### 12.3 📌 凸函数的下水平集是凸集
+
+**定理：** 设 $f: \mathbb{R}^n \to \mathbb{R}$ 凸，定义 $C = \lbrace x \in \mathbb{R}^n : f(x) \leq 0\rbrace$，则 $C$ 是凸集。
+
+**证明：** 取 $x, y \in C$（即 $f(x) \leq 0$，$f(y) \leq 0$），$\lambda \in [0,1]$：
+
+$$f(\lambda x + (1-\lambda)y) \leq \lambda f(x) + (1-\lambda)f(y) \leq \lambda \cdot 0 + (1-\lambda) \cdot 0 = 0$$
+
+故 $\lambda x + (1-\lambda)y \in C$。$\blacksquare$
+
+### 12.4 📌 约束优化的可行域是凸集
+
+考虑约束问题 $\min f(x)$ s.t. $g_1(x) \leq 0, \ldots, g_m(x) \leq 0$，其中 $g_i$ 均凸。
+
+- 定义 $C_i = \lbrace x : g_i(x) \leq 0\rbrace$，由上述定理 $C_i$ 是凸集
+- 可行域 $C = C_1 \cap C_2 \cap \cdots \cap C_m$ 是凸集的交，故 $C$ 也是凸集
+
+### 12.5 [非考点] 严格凸函数与唯一最优解
+
+**定义：** $f$ **严格凸** (strictly convex) 如果对 $x \neq y$，$\lambda \in (0,1)$：
+
+$$f(\lambda x + (1-\lambda)y) < \lambda f(x) + (1-\lambda)f(y)$$
+
+**定理：** 设 $g$ 严格凸，$\mathbb{X}$ 为凸集，则 $\min_{x \in \mathbb{X}} g(x)$ 有**唯一**最优解。
+
+**证明（反证法）：** 假设 $x^{\ast} \neq y^{\ast}$ 均为最优解，$g(x^{\ast}) = g(y^{\ast}) = z^{\ast}$。因为 $\mathbb{X}$ 凸，$\lambda x^{\ast} + (1-\lambda)y^{\ast} \in \mathbb{X}$。由严格凸性：
+
+$$g(\lambda x^{\ast} + (1-\lambda)y^{\ast}) < \lambda z^{\ast} + (1-\lambda)z^{\ast} = z^{\ast}$$
+
+这给出了严格更好的可行解，与 $z^{\ast}$ 的最优性矛盾。$\blacksquare$
+
+### 12.6 [非考点] Projected Gradient Descent
+
+当 GD 的更新 $x^k - \gamma \nabla f(x^k)$ 可能落在可行域 $\mathbb{X}$ 外部时，需要**投影**回去。
+
+**投影算子：**
+
+$$\Pi_\mathbb{X}(x) = \arg\min_{y \in \mathbb{X}} \lVert y - x \rVert^2$$
+
+**Projected GD 算法：**
+
+$$y^{k+1} = x^k - \gamma \nabla f(x^k), \qquad x^{k+1} = \Pi_\mathbb{X}(y^{k+1})$$
+
+注意：若 $x \in \mathbb{X}$，则 $\Pi_\mathbb{X}(x) = x$（无需投影）。
+
+---
+
+## 考点覆盖总结
+
+| 考点 | 主要 Lecture | 关键内容 |
+|------|-------------|---------|
+| 1. GD idea | Lec 3, 4 | 梯度定义、GD 更新规则、步长选择 |
+| 2. Bisection & Golden Section | Lec 4, 5, 6 | 两种算法、$\beta = (-1+\sqrt{5})/2$、步长线搜索 |
+| 3. Penalty & Barrier | Lec 6, 7 | 两种方法的完整算法、对比 |
+| 4. Taylor's Theorem | Lec 7, 8 | 定理陈述、推论、GD 函数值下降证明 |
+| 5. Convex Function Def | Lec 8, 9 | 定义、Jensen 不等式 |
+| 6. First-Order Characterization | Lec 9 | 双向证明、局部=全局、$\nabla f = 0$ 充分性 |
+| 7. Convergence (Bounded Grad) | Lec 10 | 预备分析、$O(1/\sqrt{K})$ 收敛 |
+| 8. Convergence (Smooth Convex) | Lec 11 | 光滑性定义、$O(1/K)$ 收敛 |
+| 9. Convex Sets | Lec 12 | 定义、交集、下水平集 |
+
+---
+
 # Typical Exam Questions
 
 ## Code & Excel
 
-### Bisection and Golden Section Search
+### Topic 2 — Bisection and Golden Section Search
 
 #### Bisection Search
 
@@ -631,7 +960,60 @@ Local minimum at x = -0.938, objective value = -0.9222264671231972
 
 ---
 
-### Gradient Descent
+#### Manual Bisection by Hand
+
+To get a feel for the algorithm, trace it by hand on $f(x) = (x - 2)^2 + 1$ with initial interval $[0, 5]$, perturbation $\varepsilon = 0.1$, tolerance $\theta = 1$.
+
+| Iter $k$ | $[a^k, b^k]$ | $\lambda^k$ | $\rho^k$ | $f(\lambda^k)$ | $f(\rho^k)$ | Decision | New $[a^{k+1}, b^{k+1}]$ |
+|---|---|---|---|---|---|---|---|
+| 0 | $[0, 5]$ | $2.4$ | $2.6$ | $1.16$ | $1.36$ | $f(\lambda) \leq f(\rho)$ | $[0, 2.6]$ |
+| 1 | $[0, 2.6]$ | $1.2$ | $1.4$ | $1.64$ | $1.36$ | $f(\lambda) > f(\rho)$ | $[1.2, 2.6]$ |
+| 2 | $[1.2, 2.6]$ | $1.8$ | $2.0$ | $1.04$ | $1.00$ | $f(\lambda) > f(\rho)$ | $[1.8, 2.6]$ |
+
+Final interval length $|2.6 - 1.8| = 0.8 \leq \theta = 1$ — stop. Returned midpoint $\approx 2.2$, close to the true minimizer $x = 2$.
+
+---
+
+#### Why $\beta = \frac{\sqrt 5 - 1}{2}$ for Golden Section
+
+Golden section uses two trial points inside $[a^k, b^k]$ placed symmetrically:
+
+$$\lambda^k = \beta a^k + (1 - \beta) b^k, \qquad \rho^k = (1 - \beta) a^k + \beta b^k$$
+
+We want two properties simultaneously:
+
+1. **Uniform shrink rate**: $b^{k+1} - a^{k+1} = \beta (b^k - a^k)$.
+2. **Reuse one evaluation**: when the new interval is $[a^k, \rho^k]$, the old $\lambda^k$ should become the new $\rho^{k+1}$ (so we only compute one fresh function value per iteration).
+
+Writing out condition 2: $\rho^{k+1} = (1 - \beta) a^k + \beta \rho^k$ must equal $\lambda^k = \beta a^k + (1 - \beta) b^k$. Substituting $\rho^k = (1 - \beta) a^k + \beta b^k$:
+
+$$(1 - \beta) a^k + \beta [(1 - \beta) a^k + \beta b^k] = \beta a^k + (1 - \beta) b^k$$
+
+Expand the left side: $(1 - \beta^2) a^k + \beta^2 b^k$. Matching the $b^k$ coefficient gives $\beta^2 = 1 - \beta$, i.e.,
+
+$$\beta^2 + \beta - 1 = 0 \quad \Longrightarrow \quad \beta = \frac{-1 + \sqrt 5}{2} \approx 0.618$$
+
+(We discard the negative root.) The $a^k$ coefficient equation $1 - \beta^2 = \beta$ is automatically the same condition, confirming consistency.
+
+---
+
+#### Iteration Count: Bisection vs Golden Section
+
+Initial interval length $L_0 = 10$, stopping tolerance $\theta = 10^{-3}$. How many iterations does each method need?
+
+**Bisection** halves the interval: $L_K = L_0 \cdot (1/2)^K$. Require $L_K \leq \theta$:
+
+$$K \geq \log_2 \frac{L_0}{\theta} = \log_2 10^4 \approx 13.29 \quad \Rightarrow \quad K = 14$$
+
+**Golden section** shrinks by factor $\beta$: $L_K = L_0 \cdot \beta^K$. Require $\beta^K \leq \theta / L_0 = 10^{-4}$:
+
+$$K \geq \frac{-4}{\log_{10} \beta} = \frac{-4}{\log_{10} 0.618} \approx \frac{-4}{-0.2091} \approx 19.13 \quad \Rightarrow \quad K = 20$$
+
+Bisection converges in fewer iterations, but each bisection step uses **2** function evaluations; golden section reuses one, so after the first step it uses only **1** evaluation per iteration. Total evaluations: bisection $\approx 28$, golden section $\approx 21$. In the regime where function evaluations are expensive (the usual case in practice), golden section wins.
+
+---
+
+### Topic 1 — Gradient Descent
 
 #### Gradient Descent with Bisection Line Search
 
@@ -706,7 +1088,58 @@ x = [-2.84263012  0.28933933], f(x) = 4.16e-07
 
 ---
 
-### Penalty Function Method
+#### Manual Gradient Descent on a Quadratic
+
+**Function:** $f(x_1, x_2) = 2x_1^2 + x_2^2 - x_1 x_2$
+
+**Gradient:** $\nabla f(x) = (4x_1 - x_2,\ 2x_2 - x_1)^{\top}$
+
+**Setup:** Starting point $x^0 = (1, 1)^{\top}$, fixed step size $\alpha = 0.1$. Do 2 iterations of gradient descent by hand.
+
+**Iteration 1.** At $x^0 = (1, 1)^{\top}$:
+
+$$\nabla f(x^0) = (4(1) - 1,\ 2(1) - 1)^{\top} = (3, 1)^{\top}$$
+
+$$x^1 = x^0 - \alpha \nabla f(x^0) = (1, 1)^{\top} - 0.1 \cdot (3, 1)^{\top} = (0.7, 0.9)^{\top}$$
+
+Verify descent:
+
+- $f(x^0) = 2(1)^2 + (1)^2 - (1)(1) = 2$
+- $f(x^1) = 2(0.7)^2 + (0.9)^2 - (0.7)(0.9) = 0.98 + 0.81 - 0.63 = 1.16$
+- $f(x^1) < f(x^0)$ ✓
+
+**Iteration 2.** At $x^1 = (0.7, 0.9)^{\top}$:
+
+$$\nabla f(x^1) = (4(0.7) - 0.9,\ 2(0.9) - 0.7)^{\top} = (1.9, 1.1)^{\top}$$
+
+$$x^2 = x^1 - 0.1 \cdot (1.9, 1.1)^{\top} = (0.51, 0.79)^{\top}$$
+
+Verify descent:
+
+- $f(x^2) = 2(0.51)^2 + (0.79)^2 - (0.51)(0.79) = 0.5202 + 0.6241 - 0.4029 = 0.7414$
+- $f(x^2) < f(x^1)$ ✓
+
+**Discussion:** The step size $\alpha = 0.1$ is small enough to guarantee descent at each iteration. To find the unique stationary point, set $\nabla f = 0$: from $4x_1 - x_2 = 0$ and $2x_2 - x_1 = 0$ we get $x_1 = x_2 = 0$, so the minimum is at the origin with $f(0, 0) = 0$. The Hessian $H = \begin{pmatrix} 4 & -1 \\ -1 & 2 \end{pmatrix}$ has $\det(H) = 7 > 0$ and positive trace, so $H$ is positive definite and $f$ is strongly convex — the origin is the unique global minimum. The iterates $(1, 1) \to (0.7, 0.9) \to (0.51, 0.79)$ are moving toward the origin as expected.
+
+---
+
+#### Step Size Matters: Overshoot on a Non-Quadratic
+
+The previous problem used a "safe" step size. Here we see what happens when $\alpha$ is too large.
+
+Consider $f(x) = x^4 - 2x^2$ with $f'(x) = 4x^3 - 4x$, starting at $x^0 = 1.5$. We have $f(1.5) = 5.0625 - 4.5 = 0.5625$ and $f'(1.5) = 13.5 - 6 = 7.5$. Compare three step sizes after one step $x^1 = x^0 - \alpha f'(x^0) = 1.5 - 7.5\alpha$:
+
+| $\alpha$ | $x^1$ | $f(x^1)$ | Outcome |
+|---|---|---|---|
+| $0.05$ | $1.125$ | $-0.929$ | clean descent |
+| $0.25$ | $-0.375$ | $-0.262$ | descent, but crossed to opposite side |
+| $0.5$ | $-2.25$ | $15.503$ | **overshoot** — function value worse |
+
+The two local minima of $f$ are at $x = \pm 1$ (both with $f = -1$). With $\alpha = 0.5$ the step is so large that we blow past both minima and land deep on the outer branch of the quartic. This is exactly the failure mode line search (Topic 2) is designed to prevent.
+
+---
+
+### Topic 3 — Penalty Function Method
 
 #### Penalty Function Method
 
@@ -858,9 +1291,69 @@ This matches the penalty method result. Both find the same optimum at the inters
 
 ---
 
+#### Penalty: One GD Step on a Simple Problem
+
+For intuition, do one iteration of the penalty method by hand. Consider
+
+$$\min \; f(x) = x_1^2 + x_2^2 \quad \text{s.t.} \quad x_1 + x_2 \geq 4$$
+
+Rewrite the constraint as $g(x) = 4 - x_1 - x_2 \leq 0$. Penalized objective with $\theta = 10$:
+
+$$h(x) = x_1^2 + x_2^2 + 10 (\max\lbrace 0, g(x) \rbrace)^2$$
+
+Starting at $x^0 = (1, 1)$: $g(x^0) = 2 > 0$ — constraint violated, penalty active. So locally
+
+$$h(x) = x_1^2 + x_2^2 + 10(4 - x_1 - x_2)^2, \qquad \nabla h(x) = (2x_1 - 20(4 - x_1 - x_2),\ 2x_2 - 20(4 - x_1 - x_2))^{\top}$$
+
+At $x^0$: $\nabla h(x^0) = (2 - 40,\ 2 - 40)^{\top} = (-38, -38)^{\top}$. One GD step with $\gamma = 0.05$:
+
+$$x^1 = (1, 1) - 0.05 \cdot (-38, -38) = (2.9, 2.9)$$
+
+Now $g(x^1) = 4 - 5.8 = -1.8 \leq 0$ — back inside the feasible region after one step. The penalty term "pulled" the iterate across the constraint boundary. The true optimum is on the boundary at $x^{\ast} = (2, 2)$ with $f(x^{\ast}) = 8$; our single step slightly overshoots into the interior, and subsequent iterations (with increasing $\theta$) settle back onto the boundary.
+
+---
+
+#### Barrier Method: Closed-Form Path as $\mu \downarrow 0$
+
+Minimize $f(x) = x^2$ subject to $x \geq 1$. The logarithmic barrier formulation is
+
+$$h(x; \mu) = x^2 - \mu \ln(x - 1), \qquad x > 1$$
+
+Setting $h'(x; \mu) = 2x - \dfrac{\mu}{x - 1} = 0$ gives $2x(x - 1) = \mu$, a quadratic in $x$:
+
+$$2x^2 - 2x - \mu = 0 \quad \Longrightarrow \quad x^{\ast}(\mu) = \frac{1 + \sqrt{1 + 2\mu}}{2}$$
+
+(Taking the positive root so $x > 1$.) Tracking the barrier sequence:
+
+| $\mu$ | $x^{\ast}(\mu)$ |
+|---|---|
+| $1$ | $\tfrac{1 + \sqrt 3}{2} \approx 1.366$ |
+| $0.1$ | $\tfrac{1 + \sqrt{1.2}}{2} \approx 1.048$ |
+| $0.01$ | $\tfrac{1 + \sqrt{1.02}}{2} \approx 1.005$ |
+| $\to 0$ | $\to 1$ |
+
+The barrier path approaches the active constraint $x = 1$ from the strictly feasible side — the hallmark of interior-point methods.
+
+---
+
+#### Penalty vs Barrier: Side by Side
+
+| | Penalty | Barrier |
+|---|---|---|
+| Augmented objective | $f(x) + \theta \sum_i (\max\lbrace 0, g_i(x)\rbrace)^2$ | $f(x) - \mu \sum_i \ln(-g_i(x))$ |
+| Iterates' feasibility | may be infeasible | always **strictly** feasible |
+| Starting point | anywhere | must be strictly interior |
+| Key parameter | $\theta \uparrow \infty$ | $\mu \downarrow 0$ |
+| Approach to $x^{\ast}$ | from outside the feasible set | from inside, along the central path |
+| Handles equality constraints | yes (squared term) | no directly (log undefined) |
+
+The two methods are complementary: penalty is robust but only satisfies constraints in the limit; barrier is always feasible but requires a strictly interior starting point and smooth inequality constraints.
+
+---
+
 ## Deduction Problem
 
-### Taylor's Theorem
+### Topic 4 — Taylor's Theorem
 
 #### Proof that $h(x, y) = o(\lVert y - x \rVert)$
 
@@ -898,7 +1391,43 @@ Because $y^2 + yy - 2y^2 + 4y - 4y = 0$, both limits above are zero.
 
 ---
 
-### Definition of a Convex Function
+#### Another Taylor Residual: $f(x) = x^3$ Expanded at $x_0 = 2$
+
+Same setup as the previous problem, just a different base point and a cleaner factoring. Take $f(x) = x^3$, so $f'(x) = 3x^2$ and $f'(2) = 12$. The residual at base point $x_0 = 2$ is
+
+$$h(2, y) = f(y) - f(2) - f'(2)(y - 2) = y^3 - 8 - 12(y - 2) = y^3 - 12y + 16$$
+
+Since $y = 2$ is clearly a root (gives $8 - 24 + 16 = 0$), divide out $(y - 2)$:
+
+$$y^3 - 12y + 16 = (y - 2)(y^2 + 2y - 8)$$
+
+Hence $h(2, y) = (y - 2)(y^2 + 2y - 8)$, and
+
+$$\frac{h(2, y)}{|y - 2|} = \pm (y^2 + 2y - 8) \xrightarrow{y \to 2} \pm (4 + 4 - 8) = 0$$
+
+So $h(2, y) = o(|y - 2|)$. The punchline is the same as the previous problem: whenever $f$ is smooth, the first-order approximation error vanishes faster than $|y - x|$.
+
+---
+
+#### Taylor Justifies Gradient Descent
+
+Why does a small gradient step actually decrease $f$? Taylor's theorem gives the answer. For any smooth $f$ and any direction $d$,
+
+$$f(x + \alpha d) = f(x) + \alpha \nabla f(x)^{\top} d + o(\alpha \lVert d \rVert)$$
+
+Set $d = -\nabla f(x)$, so $\lVert d \rVert = \lVert \nabla f(x) \rVert$:
+
+$$f(x - \alpha \nabla f(x)) = f(x) - \alpha \lVert \nabla f(x) \rVert^2 + o\!\left(\alpha \lVert \nabla f(x) \rVert\right)$$
+
+Assume $\nabla f(x) \neq 0$. The dominant correction to $f(x)$ is the term $-\alpha \lVert \nabla f(x) \rVert^2$, which is **linear** in $\alpha$; the remainder is $o(\alpha)$, i.e., strictly lower order. By definition of little-$o$, there exists $\alpha_0 > 0$ such that for all $\alpha \in (0, \alpha_0)$,
+
+$$\left| o\!\left(\alpha \lVert \nabla f(x) \rVert\right) \right| < \alpha \lVert \nabla f(x) \rVert^2$$
+
+and therefore $f(x - \alpha \nabla f(x)) < f(x)$. This is the rigorous reason why a sufficiently small step in the negative gradient direction always decreases $f$ at any non-stationary point.
+
+---
+
+### Topic 5 — Definition of a Convex Function
 
 #### Show $f(x) = x^2$ is convex
 
@@ -982,7 +1511,128 @@ This is exactly the definition of convexity. Hence, $h$ is convex. $\blacksquare
 
 ---
 
-### GD Convergence (Strongly Convex Functions)
+### Topic 6 — First-Order Characterization
+
+#### Numerical Sanity Check on $f(x) = x^4$
+
+The first-order characterization says that a convex $f$ lies above every one of its tangent lines:
+
+$$f(y) \geq f(x) + f'(x)(y - x)$$
+
+Verify on $f(x) = x^4$ (convex since $f''(x) = 12x^2 \geq 0$), with $f'(x) = 4x^3$.
+
+- Take $x = 1$, $y = 2$: LHS $= 16$, RHS $= 1 + 4(1)(1) = 5$. Slack $= 11$. ✓
+- Take $x = 2$, $y = 1$: LHS $= 1$, RHS $= 16 + 32(1 - 2) = -16$. Slack $= 17$. ✓
+
+The slack (LHS minus RHS) measures the curvature above the tangent line at $x$.
+
+---
+
+#### Stationary $+$ Convex $\Rightarrow$ Global Minimum
+
+Claim: if $f$ is convex and $\nabla f(x^{\ast}) = 0$, then $x^{\ast}$ is a global minimizer.
+
+Apply the first-order characterization at the base point $x^{\ast}$:
+
+$$f(y) \geq f(x^{\ast}) + \nabla f(x^{\ast})^{\top} (y - x^{\ast}) = f(x^{\ast}) + 0 = f(x^{\ast}) \qquad \forall y$$
+
+So $f(y) \geq f(x^{\ast})$ for every $y$, i.e., $x^{\ast}$ is a global minimizer. $\blacksquare$
+
+This is why for convex problems we don't need to worry about distinguishing local from global minima — every critical point is automatically global.
+
+---
+
+#### Jensen's Inequality from the First-Order Characterization
+
+Topic 5 proves Jensen's inequality directly from the definition of convexity. Here is the alternative route: assuming the first-order characterization, derive the two-point Jensen inequality.
+
+Let $x, y \in \mathbb{R}^n$, $\lambda \in [0, 1]$, and set $z = \lambda x + (1 - \lambda) y$. Apply the first-order characterization at base point $z$ twice:
+
+$$f(x) \geq f(z) + \nabla f(z)^{\top}(x - z), \qquad f(y) \geq f(z) + \nabla f(z)^{\top}(y - z)$$
+
+Multiply the first inequality by $\lambda \geq 0$ and the second by $(1 - \lambda) \geq 0$, then add:
+
+$$\lambda f(x) + (1 - \lambda) f(y) \geq f(z) + \nabla f(z)^{\top} \bigl[\lambda(x - z) + (1 - \lambda)(y - z)\bigr]$$
+
+The bracket collapses: $\lambda(x - z) + (1 - \lambda)(y - z) = \lambda x + (1 - \lambda) y - z = 0$. Hence
+
+$$\lambda f(x) + (1 - \lambda) f(y) \geq f(z) = f(\lambda x + (1 - \lambda) y) \qquad \blacksquare$$
+
+Together with Topic 5's direct proof, this closes the loop: the definition of convexity and the first-order characterization are equivalent on smooth functions.
+
+---
+
+### Topic 7 — GD Convergence with Bounded Gradients
+
+#### Plugging Numbers into $RB / \sqrt K$
+
+For a convex $f$ with $\lVert \nabla f(x) \rVert \leq B$ on the iterate path and $\lVert x^0 - x^{\ast} \rVert \leq R$, the fixed-step-size GD average regret satisfies
+
+$$\frac{1}{K} \sum_{k=0}^{K-1} \bigl(f(x^k) - f(x^{\ast})\bigr) \leq \frac{RB}{\sqrt K}$$
+
+Given $B = 2$, $R = 1$, target accuracy $\varepsilon = 0.01$:
+
+$$\frac{RB}{\sqrt K} \leq \varepsilon \quad \Longleftrightarrow \quad \sqrt K \geq \frac{RB}{\varepsilon} = 200 \quad \Longleftrightarrow \quad K \geq 40{,}000$$
+
+So at least $40{,}000$ iterations are needed.
+
+---
+
+#### Where $\gamma^{\ast} = R / (B \sqrt K)$ Comes From
+
+The telescoping-sum bound at the heart of Topic 7 reads
+
+$$\sum_{k=0}^{K-1} \bigl(f(x^k) - f(x^{\ast})\bigr) \leq \frac{\gamma}{2} \sum_{k=0}^{K-1} \lVert g^k \rVert^2 + \frac{1}{2\gamma} \lVert x^0 - x^{\ast} \rVert^2$$
+
+Using $\lVert g^k \rVert \leq B$ and $\lVert x^0 - x^{\ast} \rVert \leq R$, then dividing by $K$:
+
+$$\text{average regret} \leq \frac{\gamma B^2}{2} + \frac{R^2}{2 \gamma K}$$
+
+Treat the RHS as a function of $\gamma > 0$ and set its derivative to zero:
+
+$$\frac{B^2}{2} - \frac{R^2}{2 \gamma^2 K} = 0 \quad \Longrightarrow \quad \gamma^{\ast} = \frac{R}{B \sqrt K}$$
+
+Substituting back:
+
+$$\text{average regret} \leq \frac{R B}{2 \sqrt K} + \frac{R B}{2 \sqrt K} = \frac{R B}{\sqrt K}$$
+
+The two halves of the RHS contribute equally at the optimum — a classic arithmetic-geometric balance.
+
+---
+
+### Topic 8 — GD Convergence for Smooth Convex Functions
+
+#### Plugging Numbers into $L R^2 / (2K)$
+
+For an $L$-smooth convex $f$ with $\lVert x^0 - x^{\ast} \rVert \leq R$ and step $\gamma = 1/L$:
+
+$$f(x^K) - f(x^{\ast}) \leq \frac{L R^2}{2 K}$$
+
+With $L = 4$, $R = 1$, $\varepsilon = 0.01$: require $\tfrac{4}{2K} \leq 0.01$, i.e., $K \geq 200$.
+
+Contrast with Topic 7 ($K = 40{,}000$ for the same $\varepsilon$): assuming smoothness gives an $O(1/K)$ rate instead of $O(1 / \sqrt K)$, a dramatic improvement. Smoothness lets each step extract more information about how $f$ behaves nearby.
+
+---
+
+#### Descent Lemma: One-Step Drop of $\frac{1}{2L} \lVert \nabla f(x^k) \rVert^2$
+
+$L$-smoothness gives the upper-bound quadratic model
+
+$$f(y) \leq f(x) + \nabla f(x)^{\top}(y - x) + \frac{L}{2} \lVert y - x \rVert^2$$
+
+Apply this with $x = x^k$ and $y = x^{k+1} = x^k - \gamma \nabla f(x^k)$, so $y - x = -\gamma \nabla f(x^k)$:
+
+$$f(x^{k+1}) \leq f(x^k) - \gamma \lVert \nabla f(x^k) \rVert^2 + \frac{L \gamma^2}{2} \lVert \nabla f(x^k) \rVert^2 = f(x^k) - \gamma\!\left(1 - \frac{L \gamma}{2}\right) \lVert \nabla f(x^k) \rVert^2$$
+
+The coefficient $\gamma(1 - L\gamma/2)$ is maximized at $\gamma = 1/L$, yielding
+
+$$f(x^{k+1}) \leq f(x^k) - \frac{1}{2 L} \lVert \nabla f(x^k) \rVert^2$$
+
+So each GD step decreases $f$ by at least $\tfrac{1}{2L} \lVert \nabla f(x^k) \rVert^2$. Summing this telescoping bound from $k = 0$ to $K - 1$ is exactly what produces the $LR^2/(2K)$ rate used above.
+
+---
+
+### Topic 7/8 — GD Convergence (Strongly Convex Functions)
 
 ####  Strongly Convex GD Convergence Bound
 
@@ -991,7 +1641,50 @@ This is exactly the definition of convexity. Hence, $h$ is convex. $\blacksquare
 
 ---
 
-### Logistic Regression Gradient
+### Topic 9 — Convex Sets
+
+#### Quick Quiz: Which of These Are Convex?
+
+For each set, answer convex or not. For "not convex," give an explicit counterexample $x, y$ in the set with $\lambda x + (1 - \lambda) y$ outside.
+
+| Set | Convex? | Reason / Counterexample |
+|---|---|---|
+| (a) $\lbrace x \in \mathbb{R}^n : \lVert x \rVert_2 \leq 1 \rbrace$ | ✓ | By triangle inequality: $\lVert \lambda x + (1-\lambda) y \rVert \leq \lambda \lVert x \rVert + (1-\lambda)\lVert y \rVert \leq 1$ |
+| (b) $\lbrace x \in \mathbb{R}^2 : x_1 x_2 \geq 0 \rbrace$ | ✗ | $x = (1, 2)$, $y = (-2, -1)$ are in; midpoint $(-0.5, 0.5)$ has product $-0.25 < 0$ |
+| (c) $\lbrace x \in \mathbb{R}^n : A x = b \rbrace$ | ✓ | Affine set: $A(\lambda x + (1-\lambda) y) = \lambda b + (1-\lambda) b = b$ |
+| (d) $\lbrace x \in \mathbb{R}^2 : x_1^2 + x_2^2 = 1 \rbrace$ | ✗ | $x = (1, 0)$, $y = (-1, 0)$ both on the circle; midpoint $(0, 0)$ is not |
+
+Pattern: **"$\leq$" inequalities on convex functions tend to give convex sets; equalities involving curvature do not.**
+
+---
+
+#### Intersection of Convex Sets Is Convex
+
+Let $C_1, C_2 \subseteq \mathbb{R}^n$ be convex. Show $C_1 \cap C_2$ is convex.
+
+Take any $x, y \in C_1 \cap C_2$ and any $\lambda \in [0, 1]$. Since $x, y \in C_1$ and $C_1$ is convex, $\lambda x + (1 - \lambda) y \in C_1$. By the same reasoning with $C_2$, it is also in $C_2$. Hence it is in $C_1 \cap C_2$. $\blacksquare$
+
+By induction the same argument extends to any (even infinite) intersection. This is why feasible regions defined by many inequality constraints $\lbrace x : g_i(x) \leq 0, \forall i \rbrace$ are convex whenever each $\lbrace x : g_i(x) \leq 0 \rbrace$ is — a fact quietly used throughout Topic 3.
+
+---
+
+#### Halfspaces Are Convex
+
+A halfspace is $H = \lbrace x \in \mathbb{R}^n : a^{\top} x \leq b \rbrace$ for some $a \in \mathbb{R}^n$, $b \in \mathbb{R}$. Show $H$ is convex.
+
+Take $x, y \in H$ and $\lambda \in [0, 1]$. Then $a^{\top} x \leq b$ and $a^{\top} y \leq b$, so
+
+$$a^{\top}(\lambda x + (1 - \lambda) y) = \lambda \, a^{\top} x + (1 - \lambda) \, a^{\top} y \leq \lambda b + (1 - \lambda) b = b$$
+
+Hence $\lambda x + (1 - \lambda) y \in H$. $\blacksquare$
+
+Combined with the previous problem, any feasible region of a linear program — a polyhedron $\lbrace x : A x \leq b \rbrace$, i.e., an intersection of finitely many halfspaces — is convex.
+
+---
+
+### Appendix — Not in 9 Exam Topics
+
+####  Logistic Regression Gradient
 
 Define $x_0^j = 1$ for all $j$. Then for $\ell \in \lbrace 0, 1, 2, 3\rbrace$:
 
