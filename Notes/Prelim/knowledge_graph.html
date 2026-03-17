@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OPT-AI 知识图谱 Knowledge Graph — Lecture 1-12</title>
+<script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0a0e1a;
+    font-family: 'SF Pro Display', -apple-system, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    color: #e0e6f0;
+    overflow: hidden;
+  }
+  #cy { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; }
+
+  .topbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: rgba(10,14,26,0.88); backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar h1 {
+    font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .legend { display: flex; gap: 18px; font-size: 11px; color: #8892a8; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+  .panel {
+    position: fixed; right: -480px; top: 0; bottom: 0;
+    width: 460px; z-index: 200;
+    background: rgba(12,16,28,0.97); backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(255,255,255,0.08);
+    padding: 56px 24px 24px; overflow-y: auto;
+    transition: right 0.35s cubic-bezier(0.4,0,0.2,1);
+  }
+  .panel.open { right: 0; }
+  .panel-close {
+    position: absolute; top: 14px; right: 14px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); border: none;
+    color: #8892a8; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .panel-close:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .panel-lecture { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 4px; }
+  .panel-title { font-size: 20px; font-weight: 700; margin-bottom: 2px; line-height: 1.3; }
+  .panel-title-cn { font-size: 15px; font-weight: 600; color: #8892a8; margin-bottom: 4px; }
+  .panel-sub { font-size: 12px; color: #6b7994; margin-bottom: 2px; }
+  .panel-sub-cn { font-size: 12px; color: #4b5563; margin-bottom: 18px; font-style: italic; }
+  .section { margin-bottom: 20px; }
+  .section h3 {
+    font-size: 11px; color: #60a5fa; letter-spacing: 0.8px;
+    text-transform: uppercase; margin-bottom: 8px; font-weight: 600;
+  }
+  .section p, .section li { font-size: 13px; line-height: 1.75; color: #b0b8cc; }
+  .section ul { padding-left: 16px; }
+  .section li { margin-bottom: 4px; }
+  .cn { color: #7a8499; font-size: 12px; display: block; margin-top: 1px; }
+  .formula-box {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 8px; padding: 10px 14px;
+    font-family: 'Courier New', monospace; font-size: 13px; color: #a78bfa;
+    margin: 6px 0; white-space: pre-wrap; overflow-x: auto;
+  }
+  .conn-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .conn-tag {
+    font-size: 11px; padding: 4px 10px; border-radius: 8px;
+    cursor: pointer; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04); color: #8892a8; transition: all 0.2s;
+  }
+  .conn-tag:hover { background: rgba(96,165,250,0.15); color: #60a5fa; border-color: rgba(96,165,250,0.3); }
+
+  .controls {
+    position: fixed; bottom: 20px; right: 20px; z-index: 100;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .ctrl-btn {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: rgba(16,20,36,0.92); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #8892a8; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ctrl-btn:hover { background: rgba(40,48,72,0.9); color: #fff; }
+
+  .hint {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 100; font-size: 11px; color: #4b5563;
+    background: rgba(10,14,26,0.8); padding: 6px 14px; border-radius: 20px;
+    pointer-events: none; animation: fadeOut 8s forwards;
+  }
+  @keyframes fadeOut { 0%,70% { opacity:1; } 100% { opacity:0; } }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>OPT-AI 知识图谱 Knowledge Graph &mdash; 12 Lectures</h1>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>I 动机与建模 Modeling</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>II 算法与工具 Algorithms</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>III 理论与收敛 Theory</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>IV 凸几何 Geometry</div>
+  </div>
+</div>
+
+<div id="cy"></div>
+
+<div class="panel" id="panel">
+  <button class="panel-close" id="panelClose">&times;</button>
+  <div id="panelContent"></div>
+</div>
+
+<div class="controls">
+  <button class="ctrl-btn" id="zoomIn">+</button>
+  <button class="ctrl-btn" id="zoomOut">&minus;</button>
+  <button class="ctrl-btn" id="zoomFit" style="font-size:11px">Fit</button>
+</div>
+
+<div class="hint">滚轮缩放 Scroll to zoom &bull; 拖拽平移 Drag to pan &bull; 点击节点查看详情 Click node &bull; ESC 关闭</div>
+
+<script>
+var PHASE = {
+  modeling:   { color: '#3b82f6', bg: '#1e3a5f', label: 'MOTIVATION & MODELING', labelCn: '动机与建模' },
+  algorithms: { color: '#f59e0b', bg: '#5f3a10', label: 'ALGORITHMS & TOOLS', labelCn: '算法与工具' },
+  theory:     { color: '#8b5cf6', bg: '#3a1e5f', label: 'THEORY & CONVERGENCE', labelCn: '理论与收敛' },
+  geometry:   { color: '#10b981', bg: '#104f3a', label: 'CONVEX GEOMETRY', labelCn: '凸几何' }
+};
+
+var DATA = {};
+
+function N(id, x, y, phase, lecture, title, titleCn, sub, subCn, tags, formulas, points) {
+  DATA[id] = { id:id, phase:phase, lecture:lecture, title:title, titleCn:titleCn, sub:sub, subCn:subCn, tags:tags, formulas:formulas, points:points };
+  return { data: { id:id, label: title + '\n' + titleCn, phase:phase, lecture:lecture }, position: { x:x, y:y } };
+}
+
+var nodes = [
+  // ── Phase I: Modeling 动机与建模 ──
+  N('opt-problem', 150, 200, 'modeling', 'L1',
+    'Optimization Problem', '优化问题',
+    'What is optimization?', '什么是优化？',
+    ['Decision Vars 决策变量', 'Obj Function 目标函数', 'Constraints 约束条件'],
+    ['max x\u00b2y\ns.t. x\u00b2+4xy \u2264 500\n     x\u22650, y\u22650'],
+    [
+      ['Three elements: decision variables, objective function, constraints', '三要素：决策变量、目标函数、约束条件'],
+      ['Box volume example: maximize volume under surface area constraint', '箱子体积例子：在表面积约束下最大化体积'],
+      ['Nonlinear optimization is hard \u2014 software may fail with bad initial guesses', '非线性优化很难——初始猜测不好时软件可能失败']
+    ]),
+
+  N('ml-opt', 480, 130, 'modeling', 'L1',
+    'ML as Optimization', '机器学习即优化',
+    'Every ML problem is an opt problem', '每个ML问题都是优化问题',
+    ['Loss Function 损失函数', 'ERM 经验风险最小化', 'Parameters 参数'],
+    ['min_w (1/M) \u03a3 \u2113(x\u2c7c, y\u2c7c, w)'],
+    [
+      ['Dataset {(x\u2c7c, y\u2c7c)}: features x\u2c7c\u2208\u211d\u207f, labels y\u2c7c\u2208\u211d', '数据集 {(x\u2c7c, y\u2c7c)}：特征 x\u2c7c\u2208\u211d\u207f，标签 y\u2c7c\u2208\u211d'],
+      ['Prediction function \u03d5(x,w) parameterized by w', '预测函数 \u03d5(x,w) 由参数 w 参数化'],
+      ['Loss \u2113 measures error, e.g. squared loss (\u03d5(x\u2c7c,w)\u2212y\u2c7c)\u00b2', '损失 \u2113 衡量误差，如平方损失 (\u03d5(x\u2c7c,w)\u2212y\u2c7c)\u00b2'],
+      ['Training = minimizing average loss over all data points', '训练 = 最小化所有数据点的平均损失']
+    ]),
+
+  N('regression', 180, 400, 'modeling', 'L1',
+    'Regression Models', '回归模型',
+    'Least Squares / Ridge / Lasso', '最小二乘 / 岭回归 / Lasso',
+    ['L2 Reg L2正则', 'L1 Reg L1正则', 'Overfitting 过拟合'],
+    ['Least Squares 最小二乘: min (1/M) \u03a3(w\u1d40x\u2c7c\u2212y\u2c7c)\u00b2',
+     'Ridge 岭回归: + \u03bb\u2016w\u2016\u2082\u00b2  (avoid overfitting 防过拟合)',
+     'Lasso: + \u03bb\u2016w\u2016\u2081   (feature selection 特征选择)'],
+    [
+      ['Linear prediction: \u0177\u2c7c = w\u1d40x\u2c7c', '线性预测：\u0177\u2c7c = w\u1d40x\u2c7c'],
+      ['Ridge (L2) shrinks all weights uniformly', 'Ridge (L2) 将所有权重均匀收缩'],
+      ['Lasso (L1) drives weights to zero \u2192 sparsity', 'Lasso (L1) 将权重驱向零 \u2192 产生稀疏性']
+    ]),
+
+  N('logistic', 480, 380, 'modeling', 'L1-2',
+    'Logistic Regression', '逻辑回归',
+    'Binary & Multi-class Classification', '二分类与多分类',
+    ['Sigmoid S型函数', 'Softmax 归一化指数', 'MLE 最大似然估计'],
+    ['Binary 二分类: \u03d5(x,w) = 1/(1+exp(w\u1d40x))',
+     'Multi 多分类: \u03d5\u2096(x) = exp(w\u2096\u1d40x) / \u03a3 exp(w\u2097\u1d40x)'],
+    [
+      ['Sigmoid for binary: P(y=+1|x)', 'Sigmoid用于二分类：P(y=+1|x)'],
+      ['Softmax for multi-class: normalizes over K classes', 'Softmax用于多分类：在K个类上归一化'],
+      ['Maximum likelihood \u2192 log-likelihood optimization', '最大似然 \u2192 对数似然优化']
+    ]),
+
+  N('deep-learning', 780, 260, 'modeling', 'L2-3',
+    'Deep Learning', '深度学习',
+    'Neural networks as nested functions', '神经网络作为嵌套函数',
+    ['Layers 层', 'ReLU', 'Sigmoid S型', 'Forward Pass 前向传播'],
+    ['a\u2c7c\u02e1 = \u03c3\u2097(Q\u02e1 a\u2c7c\u02e1\u207b\u00b9 + g\u02e1)',
+     'z(x\u2c7c) = \u03c3_L(Q\u1d38 \u03c3_{L-1}(... \u03c3\u2081(Q\u00b9x\u2c7c+g\u00b9)...)+g\u1d38)'],
+    [
+      ['L layers: linear transform + nonlinear activation', 'L层：线性变换 + 非线性激活'],
+      ['Activations: sigmoid or ReLU max{t,0}', '激活函数：sigmoid 或 ReLU max{t,0}'],
+      ['Output z(x\u2c7c) fed to softmax classifier', '输出 z(x\u2c7c) 送入softmax分类器'],
+      ['Optimization over ALL weight matrices simultaneously', '同时优化所有权重矩阵']
+    ]),
+
+  // ── Phase II: Algorithms 算法与工具 ──
+  N('gd', 1120, 220, 'algorithms', 'L3-4',
+    'Gradient Descent', '梯度下降',
+    'The core optimization engine', '核心优化引擎',
+    ['\u2207f 梯度', 'Step Size \u03b1 步长', 'Iterative 迭代'],
+    ['x\u1d4f\u207a\u00b9 = x\u1d4f \u2212 \u03b1\u1d4f \u2207f(x\u1d4f)',
+     'Small \u03b1 小步长: f(x\u2070\u2212\u03b1\u2207f(x\u2070)) \u2264 f(x\u2070)'],
+    [
+      ['Gradient \u2207f(x) = direction of steepest ascent', '梯度 \u2207f(x) = 最陡上升方向'],
+      ['Move AGAINST gradient for descent', '沿梯度反方向移动以下降'],
+      ['\u03b1 too large \u2192 overshoot; \u03b1 too small \u2192 slow', '\u03b1 太大 \u2192 越过最优点；\u03b1 太小 \u2192 收敛很慢'],
+      ['Example: f(x)=x\u2081\u00b2+4x\u2081x\u2082+3x\u2082\u00b2\u22125', '例：f(x)=x\u2081\u00b2+4x\u2081x\u2082+3x\u2082\u00b2\u22125']
+    ]),
+
+  N('local-global', 1120, 460, 'algorithms', 'L4',
+    'Local vs Global Min', '局部极小 vs 全局最小',
+    'GD finds local, not necessarily global', 'GD找到局部极小，不一定是全局',
+    ['Saddle Point 鞍点', 'Multi-start 多起点'],
+    ['Global min 全局最小 x*: f(x*) \u2264 f(x) \u2200x',
+     'Local min 局部极小 x\u0302: f(x\u0302) \u2264 f(x) \u2200x near x\u0302 在x\u0302附近'],
+    [
+      ['GD can only guarantee local minimum', 'GD只能保证找到局部极小值'],
+      ['Non-convex \u2192 many local minima traps', '非凸 \u2192 可能有很多局部极小陷阱'],
+      ['Heuristic: restart from multiple initial points', '启发式方法：从多个初始点重启'],
+      ['Convex functions: local = global (no traps!)', '凸函数：局部 = 全局（没有陷阱！）']
+    ]),
+
+  N('line-search', 1420, 120, 'algorithms', 'L4-6',
+    'Exact Line Search', '精确线搜索',
+    'Optimal step size selection', '最优步长选择',
+    ['1D Opt 一维优化', 'min_\u03b1 f(x\u2212\u03b1\u2207f)'],
+    ['min_{\u03b1\u22650} f(x\u1d4f \u2212 \u03b1 \u2207f(x\u1d4f))'],
+    [
+      ['At each GD step, find best \u03b1 along ray \u2212\u2207f(x\u1d4f)', '每步GD中，沿射线 \u2212\u2207f(x\u1d4f) 找最优\u03b1'],
+      ['Reduces to 1D optimization over scalar \u03b1', '简化为标量\u03b1上的一维优化'],
+      ['Embed bisection/golden section into each GD iteration', '将二分/黄金分割嵌入每步GD迭代']
+    ]),
+
+  N('bisection', 1420, 360, 'algorithms', 'L4-5',
+    'Bisection Search', '二分搜索',
+    '2 evals/iter, ~halving interval', '每次迭代2次求值，约减半区间',
+    ['\u03b5-symmetric \u03b5对称', '\u22481/2 shrink 约半缩'],
+    ['\u03bb\u1d4f = (a\u1d4f+b\u1d4f)/2 \u2212 \u03b5\n\u03c1\u1d4f = (a\u1d4f+b\u1d4f)/2 + \u03b5',
+     'f(\u03bb\u1d4f)\u2264f(\u03c1\u1d4f): keep 保留 [a\u1d4f,\u03c1\u1d4f]\nf(\u03bb\u1d4f)>f(\u03c1\u1d4f): keep 保留 [\u03bb\u1d4f,b\u1d4f]'],
+    [
+      ['Two probe points around midpoint', '在中点两侧放置两个探测点'],
+      ['Compare values \u2192 discard one side', '比较函数值 \u2192 丢弃一侧'],
+      ['\u03b5 small \u2192 near-halving but numerical issues', '\u03b5 很小 \u2192 接近减半但有数值问题'],
+      ['Each iteration: 2 function evaluations', '每次迭代：2次函数求值']
+    ]),
+
+  N('golden', 1700, 360, 'algorithms', 'L5',
+    'Golden Section Search', '黄金分割搜索',
+    '1 eval/iter, \u03b2 = (\u221a5\u22121)/2', '每次迭代1次求值，\u03b2 = (\u221a5\u22121)/2',
+    ['Point Reuse 点复用', '\u03b2\u22480.618'],
+    ['\u03b2\u00b2 + \u03b2 \u2212 1 = 0  \u2192  \u03b2 = (\u221a5\u22121)/2 \u2248 0.618',
+     '\u03bb\u1d4f = \u03b2\u00b7a\u1d4f + (1\u2212\u03b2)\u00b7b\u1d4f\n\u03c1\u1d4f = (1\u2212\u03b2)\u00b7a\u1d4f + \u03b2\u00b7b\u1d4f'],
+    [
+      ['Reuse one probe point from previous iteration', '复用上一轮迭代的一个探测点'],
+      ['Only 1 NEW function eval per iteration', '每次迭代只需1次新的函数求值'],
+      ['Interval shrinks by factor 0.618 each step', '区间每步缩小0.618倍'],
+      ['Golden ratio emerges from simultaneous constraints', '黄金比例从同时满足的约束中自然浮现']
+    ]),
+
+  N('deriv-1d', 1700, 560, 'algorithms', 'L5',
+    'Derivative-Based 1D', '基于导数的一维搜索',
+    "f'(mid) sign tells which half", "f'(中点) 的符号决定保留哪半",
+    ['First-order 一阶', 'Exact halving 精确减半'],
+    ["f'(mid) \u2264 0: keep right half 保留右半",
+     "f'(mid) > 0: keep left half 保留左半"],
+    [
+      ['If derivative available, better than golden section', '如果可以求导，比黄金分割更好'],
+      ['Exact halving every step (0.5 vs 0.618)', '每步精确减半（0.5 vs 0.618）'],
+      ['Only 1 derivative eval per iteration', '每次迭代只需1次导数求值'],
+      ['Theme: more info (0th\u21921st\u21922nd order) = faster', '主题：信息越多（0阶\u21921阶\u21922阶）= 收敛越快']
+    ]),
+
+  N('constrained', 1120, 680, 'algorithms', 'L6',
+    'Constrained Optimization', '约束优化',
+    'Convert constraints \u2192 unconstrained', '将约束转化为无约束',
+    ['g(x)\u22640 不等式', 'h(x)=0 等式', 'Transform 转化'],
+    ['min f(x)\ns.t. g\u1d62(x) \u2264 0,  h\u2c7c(x) = 0'],
+    [
+      ['Core strategy: convert constrained \u2192 unconstrained', '核心策略：将约束优化转化为无约束优化'],
+      ['Then reuse standard gradient descent', '然后复用标准梯度下降'],
+      ['Two approaches: penalty (outside) vs barrier (inside)', '两种方法：惩罚法（从外部逼近）vs 障碍法（从内部逼近）']
+    ]),
+
+  N('penalty', 1420, 620, 'algorithms', 'L6',
+    'Penalty Function', '惩罚函数法',
+    'Approach from OUTSIDE feasible region', '从可行域外部逼近',
+    ['\u03b8 increasing \u03b8递增', '\u03b2>1', 'Squared 平方项'],
+    ['min f(x) + \u03a3 \u03b8\u1d62(max{0,g\u1d62(x)})\u00b2 + \u03a3 \u03b3\u2c7c(h\u2c7c(x))\u00b2',
+     '\u03b8\u1d62\u1d4f\u207a\u00b9 = \u03b2\u00b7\u03b8\u1d62\u1d4f  (\u03b2 > 1)'],
+    [
+      ['Move constraints into objective via penalty terms', '通过惩罚项将约束移入目标函数'],
+      ['Inequality: zero when feasible, large when violated', '不等式约束：可行时为零，违反时很大'],
+      ['Why squared? \u2192 ensures differentiability at boundary', '为什么用平方？\u2192 确保在约束边界处可微'],
+      ['Increase \u03b8 iteratively; solution always slightly infeasible', '逐步增大\u03b8；解总是略微不可行']
+    ]),
+
+  N('barrier', 1420, 840, 'algorithms', 'L7',
+    'Barrier Function', '障碍函数法',
+    'Approach from INSIDE feasible region', '从可行域内部逼近',
+    ['\u03bc decreasing \u03bc递减', '\u03b2\u2208(0,1)', 'Interior 内点'],
+    ['min f(x) \u2212 \u03a3 \u03bc\u1d62/g\u1d62(x)',
+     '\u03bc\u1d62\u1d4f\u207a\u00b9 = \u03b2\u00b7\u03bc\u1d62\u1d4f  (\u03b2 \u2208 (0,1))'],
+    [
+      ['Barrier \u2212\u03bc/g(x) \u2192 \u221e as x approaches boundary', '障碍项 \u2212\u03bc/g(x) 在x趋近边界时趋向\u221e'],
+      ['Must start from strictly feasible interior point', '必须从严格可行的内点出发'],
+      ['Decrease \u03bc \u2192 walls thin out \u2192 approach true optimum', '减小\u03bc \u2192 "墙壁"变薄 \u2192 逼近真正最优解'],
+      ['Advantage: all iterates remain feasible', '优势：所有迭代点都保持可行'],
+      ['Warm start from previous solution', '用前一轮的解作为热启动']
+    ]),
+
+  // ── Phase III: Theory 理论与收敛 ──
+  N('little-o', 780, 680, 'theory', 'L7',
+    'Little-o Notation', '小o记号',
+    'o(t): vanishes faster than t', 'o(t)：比t消失得更快',
+    ['Asymptotic 渐近', 'g(t)/t\u21920'],
+    ['g(t) = o(t)  \u27fa  lim_{t\u21920} g(t)/t = 0',
+     't\u00b2 is o(t) \u2713    2t is NOT o(t) \u2717'],
+    [
+      ['Describes functions vanishing faster than linear', '描述比线性消失更快的函数'],
+      ['Key role: error term in Taylor approximation', '关键作用：Taylor近似中的误差项']
+    ]),
+
+  N('taylor', 780, 880, 'theory', 'L7-8',
+    "Taylor's Theorem", 'Taylor定理',
+    'Mean value theorem for \u211d\u207f', '\u211d\u207f中的中值定理',
+    ['MVT 中值定理', 'Intermediate \u03b3 中间点\u03b3'],
+    ['f(y) = f(x) + \u2207f(\u03b3x+(1\u2212\u03b3)y)\u1d40(y\u2212x)\nfor some \u03b3 \u2208 (0,1)  \u5bf9\u67d0\u4e2a\u03b3\u2208(0,1)'],
+    [
+      ['Multivariable generalization of mean value theorem', '中值定理的多变量推广'],
+      ['\u03b3 is unknown \u2014 existence result only', '\u03b3 是未知的——这只是一个存在性结论'],
+      ['Foundation for ALL convergence analysis', '所有收敛性分析的基础']
+    ]),
+
+  N('taylor-imp', 780, 1080, 'theory', 'L7-8',
+    'Taylor Implication', 'Taylor推论',
+    'First-order approx + o(\u00b7) error', '一阶近似 + o(\u00b7) 误差',
+    ['Linear approx 线性近似', 'Core tool 核心工具'],
+    ['f(y) = f(x) + \u2207f(x)\u1d40(y\u2212x) + o(\u2016y\u2212x\u2016)'],
+    [
+      ['THE most important formula in this course', '本课程最重要的公式'],
+      ['f approximated by tangent plane at x', 'f 可用x处的切平面来近似'],
+      ['Error o(\u2016y\u2212x\u2016) vanishes faster than distance', '误差 o(\u2016y\u2212x\u2016) 比距离消失得更快'],
+      ['Proof: \u2207f(intermediate) \u2212 \u2207f(x) \u2192 0 as y\u2192x', '证明：\u2207f(中间点) \u2212 \u2207f(x) \u2192 0 当 y\u2192x']
+    ]),
+
+  N('gd-proof', 1080, 1080, 'theory', 'L8',
+    'GD Descent Proof', 'GD下降性证明',
+    'Why gradient descent works', '为什么梯度下降有效',
+    ['f decreases f递减', '\u2212\u00bd\u03b1\u2016\u2207f\u2016\u00b2'],
+    ['f(x\u0302\u2212\u03b1\u2207f(x\u0302)) = f(x\u0302) \u2212 \u03b1\u2016\u2207f(x\u0302)\u2016\u00b2 + o(\u03b1\u2016\u2207f\u2016)',
+     '\u2264 f(x\u0302) \u2212 \u00bd\u03b1\u2016\u2207f(x\u0302)\u2016\u00b2 < f(x\u0302)'],
+    [
+      ['Substitute y = x\u0302 \u2212 \u03b1\u2207f(x\u0302) into Taylor implication', '将 y = x\u0302 \u2212 \u03b1\u2207f(x\u0302) 代入Taylor推论'],
+      ['Main term \u2212\u03b1\u2016\u2207f\u2016\u00b2 is STRICTLY NEGATIVE when \u2207f \u2260 0', '主项 \u2212\u03b1\u2016\u2207f\u2016\u00b2 在 \u2207f \u2260 0 时严格为负'],
+      ['Choose \u03b1 small enough so error < \u00bd of main term', '选择足够小的\u03b1使误差 < 主项的\u00bd'],
+      ['THE rigorous justification for gradient descent', '梯度下降的严格数学证明']
+    ]),
+
+  N('convex-def', 480, 880, 'theory', 'L8',
+    'Convex Function Def', '凸函数定义',
+    'Chord lies above curve', '弦在曲线上方',
+    ['\u03bb-combination \u03bb组合', 'Jensen 詹森不等式'],
+    ['f(\u03bbx+(1\u2212\u03bb)y) \u2264 \u03bbf(x) + (1\u2212\u03bb)f(y)\n\u2200x,y \u2208 \u211d\u207f, \u03bb \u2208 [0,1]'],
+    [
+      ['Line segment on graph lies ABOVE the curve', '图上任意两点的连线段在曲线上方'],
+      ['No false valleys \u2014 no bad local minima', '没有假谷——没有坏的局部极小值'],
+      ["Jensen's Inequality: extends to k points", 'Jensen不等式：推广到k个点']
+    ]),
+
+  N('jensen', 200, 880, 'theory', 'L8',
+    "Jensen's Inequality", 'Jensen不等式',
+    'Convexity for k points', 'k个点的凸性',
+    ['f(E[X])\u2264E[f(X)]', 'Induction 归纳法'],
+    ['f(\u03a3\u03bb\u2071x\u2071) \u2264 \u03a3\u03bb\u2071f(x\u2071),  \u03a3\u03bb\u2071=1, \u03bb\u2071\u22650'],
+    [
+      ['Generalization from 2 points to k points', '从2个点推广到k个点'],
+      ['Proof by induction: peel off one point at a time', '归纳法证明：每次剥离一个点'],
+      ['Probabilistic form: f(E[X]) \u2264 E[f(X)]', '概率形式：f(E[X]) \u2264 E[f(X)]']
+    ]),
+
+  N('first-order', 480, 1100, 'theory', 'L8-9',
+    'First-Order Characterization', '一阶特征刻画',
+    'Tangent is global lower bound', '切平面是全局下界',
+    ['\u27fa Convex \u27fa凸', 'Master tool 核心工具'],
+    ['f convex 凸 \u27fa f(y) \u2265 f(x) + \u2207f(x)\u1d40(y\u2212x)  \u2200x,y'],
+    [
+      ['EQUIVALENCE: convexity \u27fa tangent plane is global lower bound', '等价性：凸性 \u27fa 切平面是全局下界'],
+      ['(\u27f9) Convexity \u2192 difference quotient \u2265 directional derivative', '(\u27f9) 凸性 \u2192 差商 \u2265 方向导数'],
+      ['(\u27f8) Write lower bounds for f(a),f(b), weight by \u03bb,(1\u2212\u03bb); gradient cancels', '(\u27f8) 写出f(a),f(b)的下界，按\u03bb,(1\u2212\u03bb)加权；梯度项抵消'],
+      ['THE master tool for convex optimization theory', '凸优化理论的核心工具']
+    ]),
+
+  N('local-eq-global', 200, 1160, 'theory', 'L9',
+    'Local Min = Global Min', '局部最小 = 全局最小',
+    'No false valleys in convex functions', '凸函数中没有假谷',
+    ['Bridge point 桥点', '\u03b5-neighborhood \u03b5邻域'],
+    ['f convex 凸, x\u0302 local min 局部最小 \u27f9 x\u0302 global min 全局最小'],
+    [
+      ['Proof: for any far y, construct bridge z = \u03bbx\u0302+(1\u2212\u03bb)y in \u03b5-nbhd', '证明：对任意远点y，构造桥点 z = \u03bbx\u0302+(1\u2212\u03bb)y 在\u03b5邻域内'],
+      ['f(x\u0302) \u2264 f(z) \u2264 \u03bbf(x\u0302)+(1\u2212\u03bb)f(y) by convexity', 'f(x\u0302) \u2264 f(z) \u2264 \u03bbf(x\u0302)+(1\u2212\u03bb)f(y)（利用凸性）'],
+      ['Cancel \u2192 f(x\u0302) \u2264 f(y) for ALL y', '消去 \u2192 f(x\u0302) \u2264 f(y) 对所有y成立'],
+      ['GD on convex: cannot get stuck in bad local minima', '凸函数上GD：不会困在坏的局部极小值']
+    ]),
+
+  N('stationary', 200, 1340, 'theory', 'L9',
+    '\u2207f=0 \u27f9 Global Min', '\u2207f=0 \u27f9 全局最小',
+    'One-line proof from 1st-order char', '由一阶特征的一行证明',
+    ['Stationary point 驻点', 'Optimality 最优性'],
+    ['\u2207f(x\u0302)=0 \u27f9 f(y) \u2265 f(x\u0302)+0 = f(x\u0302)  \u2200y'],
+    [
+      ['Simplest proof in the course', '本课程最简单的证明'],
+      ['1st-order char: f(y) \u2265 f(x\u0302) + \u2207f(x\u0302)\u1d40(y\u2212x\u0302)', '一阶特征：f(y) \u2265 f(x\u0302) + \u2207f(x\u0302)\u1d40(y\u2212x\u0302)'],
+      ['\u2207f(x\u0302)=0 \u2192 gradient term vanishes', '\u2207f(x\u0302)=0 \u2192 梯度项消失'],
+      ['This is why GD works on convex: just find \u2207f \u2248 0', '这就是GD在凸函数上有效的原因：只需找到 \u2207f \u2248 0']
+    ]),
+
+  N('conv-general', 1080, 1300, 'theory', 'L10-11',
+    'GD Convergence (General)', 'GD收敛性（一般凸）',
+    'O(1/\u221aK) rate', 'O(1/\u221aK) 速率',
+    ['\u03b3=R/(B\u221aK)', 'Avg error 平均误差'],
+    ['\u2016\u2207f(x)\u2016 \u2264 B,  \u2016x\u2070\u2212x*\u2016 \u2264 R',
+     '\u03b3 = R/(B\u221aK)',
+     '(1/K) \u03a3(f(x\u1d4f)\u2212f(x*)) \u2264 RB/\u221aK',
+     'For \u03b5-accuracy 达到\u03b5精度: K = (RB/\u03b5)\u00b2'],
+    [
+      ['1st-order char \u2192 inner product \u2192 norm identity \u2192 telescoping', '一阶特征 \u2192 内积 \u2192 范数恒等式 \u2192 累加消项'],
+      ['Trade-off: small \u03b3 stuck near x\u2070; large \u03b3 overshooting', '权衡：\u03b3小则困在x\u2070附近；\u03b3大则越过最优点'],
+      ['Optimize \u03b3 \u2192 golden mean: \u03b3* = R/(B\u221aK)', '优化\u03b3 \u2192 黄金中值：\u03b3* = R/(B\u221aK)'],
+      ['AVERAGE error decays as O(1/\u221aK)', '平均误差以 O(1/\u221aK) 速率衰减'],
+      ['Constant step \u2192 bouncing, not converging: f(x)=(x\u22121)\u00b2, \u03b3=1', '固定步长 \u2192 来回震荡不收敛：f(x)=(x\u22121)\u00b2, \u03b3=1']
+    ]),
+
+  N('conv-smooth', 1080, 1540, 'theory', 'L11',
+    'GD Convergence (Smooth)', 'GD收敛性（光滑凸）',
+    'O(1/K) rate \u2014 much faster', 'O(1/K) 速率——快得多',
+    ['\u03b3=1/L', 'L-smooth L-光滑', 'Monotone 单调'],
+    ['Smooth 光滑: f(y) \u2264 f(x)+\u2207f(x)\u1d40(y\u2212x)+(L/2)\u2016y\u2212x\u2016\u00b2',
+     '\u03b3 = 1/L',
+     'f(x\u1d4f\u207a\u00b9) \u2264 f(x\u1d4f) \u2212 (1/2L)\u2016g\u1d4f\u2016\u00b2',
+     'f(x\u1d37)\u2212f(x*) \u2264 LR\u00b2/(2K)'],
+    [
+      ['Smoothness = quadratic upper bound on f', '光滑性 = f的二次上界'],
+      ['Convex f is sandwiched: linear lower \u2264 f \u2264 quadratic upper', '凸函数f被"夹"住：线性下界 \u2264 f \u2264 二次上界'],
+      ['With \u03b3=1/L: function DECREASES monotonically every step', '当\u03b3=1/L时：函数值每步单调递减'],
+      ['LAST iterate converges, not just average', '最后一步的迭代点收敛，不仅仅是平均'],
+      ['O(1/K) vs O(1/\u221aK): K=10/\u03b5 vs K=100/\u03b5\u00b2 \u2014 massive speedup', 'O(1/K) vs O(1/\u221aK)：K=10/\u03b5 vs K=100/\u03b5\u00b2——巨大加速']
+    ]),
+
+  // ── Phase IV: Geometry 凸几何 ──
+  N('convex-set', 480, 1400, 'geometry', 'L12',
+    'Convex Sets', '凸集',
+    'Line segment stays inside', '线段保持在集合内部',
+    ['Line of sight 视线', 'Intersection 交集'],
+    ['C convex 凸: \u03bbx+(1\u2212\u03bb)y \u2208 C  \u2200x,y\u2208C, \u03bb\u2208[0,1]',
+     'C\u2081\u2229...\u2229C\u2097 convex 凸 if each C\u1d62 convex 凸'],
+    [
+      ['"Direct line of sight" between any two points in set', '集合中任意两点之间有"直接视线"'],
+      ['Intersection of convex sets is convex', '凸集的交集仍然是凸集'],
+      ['Sublevel set of convex function is convex: {x: f(x)\u22640}', '凸函数的下水平集是凸集：{x: f(x)\u22640}'],
+      ['Convex constraints \u2192 convex feasible region', '凸约束 \u2192 凸可行域']
+    ]),
+
+  N('strict-unique', 480, 1620, 'geometry', 'L12',
+    'Strict Convexity \u2192 Unique Min', '严格凸 \u2192 唯一最小值',
+    'Contradiction proof', '反证法',
+    ['Strict < 严格<', 'Uniqueness 唯一性'],
+    ['f(\u03bbx+(1\u2212\u03bb)y) < \u03bbf(x)+(1\u2212\u03bb)f(y)  for x\u2260y'],
+    [
+      ['Strictly convex + convex set \u2192 UNIQUE optimal solution', '严格凸 + 凸集 \u2192 唯一最优解'],
+      ['Proof: if x*\u2260y* both optimal, midpoint has lower value \u2014 contradiction', '证明：若 x*\u2260y* 都是最优，中点值更低——矛盾'],
+      ['Guarantees projection \u03a0_X(x) is well-defined and unique', '保证投影 \u03a0_X(x) 是良定义且唯一的']
+    ]),
+
+  N('proj-gd', 780, 1500, 'geometry', 'L12',
+    'Projected Gradient Descent', '投影梯度下降',
+    'GD for constrained problems', '用于约束优化的GD',
+    ['\u03a0_X 投影', 'Step then project 先走再投影'],
+    ['y\u1d4f\u207a\u00b9 = x\u1d4f \u2212 \u03b3 \u2207f(x\u1d4f)    (gradient step 梯度步)',
+     'x\u1d4f\u207a\u00b9 = \u03a0_X(y\u1d4f\u207a\u00b9)        (projection step 投影步)',
+     '\u03a0_X(x) = argmin_{y\u2208X} \u2016y\u2212x\u2016\u00b2'],
+    [
+      ['Problem: GD step may leave feasible region', '问题：GD步可能离开可行域'],
+      ['Solution: project back onto feasible set after each step', '解决：每步之后投影回可行集'],
+      ['If x \u2208 X already, \u03a0_X(x) = x (no-op)', '如果 x 已在 X 中，\u03a0_X(x) = x（无操作）'],
+      ['Projection cost depends on set shape (closed-form for balls, boxes)', '投影代价取决于集合形状（球、盒子有闭式解）'],
+      ['Extends unconstrained GD to constrained optimization', '将无约束GD推广到约束优化']
+    ])
+];
+
+// ============================================================
+//  EDGE DATA
+// ============================================================
+var edges = [
+  { data: { source: 'opt-problem', target: 'ml-opt', label: 'ML context ML语境' } },
+  { data: { source: 'ml-opt', target: 'regression', label: '' } },
+  { data: { source: 'ml-opt', target: 'logistic', label: 'classification 分类' } },
+  { data: { source: 'logistic', target: 'deep-learning', label: 'add layers 加层' } },
+  { data: { source: 'deep-learning', target: 'gd', label: 'how to solve? 如何求解?', cross: 'yes' } },
+  { data: { source: 'gd', target: 'local-global', label: 'limitation 局限性' } },
+  { data: { source: 'gd', target: 'line-search', label: 'step size? 步长?' } },
+  { data: { source: 'gd', target: 'constrained', label: 'constraints? 约束?' } },
+  { data: { source: 'line-search', target: 'bisection', label: '' } },
+  { data: { source: 'line-search', target: 'golden', label: '' } },
+  { data: { source: 'line-search', target: 'deriv-1d', label: '' } },
+  { data: { source: 'bisection', target: 'golden', label: 'save 1 eval 省1次求值' } },
+  { data: { source: 'golden', target: 'deriv-1d', label: "use f' 用导数" } },
+  { data: { source: 'constrained', target: 'penalty', label: '' } },
+  { data: { source: 'constrained', target: 'barrier', label: '' } },
+  { data: { source: 'penalty', target: 'barrier', label: 'dual approach 对偶方法' } },
+  { data: { source: 'local-global', target: 'convex-def', label: 'convex: no traps 凸:无陷阱', cross: 'yes' } },
+  { data: { source: 'little-o', target: 'taylor', label: 'used in 用于' } },
+  { data: { source: 'taylor', target: 'taylor-imp', label: 'implies 推出' } },
+  { data: { source: 'taylor-imp', target: 'gd-proof', label: 'substitute 代入 y=x\u2212\u03b1\u2207f' } },
+  { data: { source: 'taylor-imp', target: 'first-order', label: 'used in \u27f9 proof 用于\u27f9证明' } },
+  { data: { source: 'convex-def', target: 'jensen', label: 'generalize 推广' } },
+  { data: { source: 'convex-def', target: 'first-order', label: '\u27fa' } },
+  { data: { source: 'first-order', target: 'local-eq-global', label: 'implies 推出' } },
+  { data: { source: 'first-order', target: 'stationary', label: 'one-line proof 一行证明' } },
+  { data: { source: 'first-order', target: 'conv-general', label: 'key tool 核心工具' } },
+  { data: { source: 'gd-proof', target: 'conv-general', label: 'foundation 基础' } },
+  { data: { source: 'conv-general', target: 'conv-smooth', label: 'add smoothness 加光滑性' } },
+  { data: { source: 'convex-def', target: 'convex-set', label: 'sublevel sets 下水平集', cross: 'yes' } },
+  { data: { source: 'convex-set', target: 'strict-unique', label: 'strict \u2192 严格\u2192' } },
+  { data: { source: 'convex-set', target: 'proj-gd', label: 'enables 使能' } },
+  { data: { source: 'strict-unique', target: 'proj-gd', label: '\u03a0 well-defined 良定义' } },
+  { data: { source: 'conv-smooth', target: 'proj-gd', label: 'extend 推广到约束', cross: 'yes' } },
+];
+
+// ============================================================
+//  INIT CYTOSCAPE
+// ============================================================
+var cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements: { nodes: nodes, edges: edges },
+  userZoomingEnabled: true,
+  userPanningEnabled: true,
+  boxSelectionEnabled: false,
+  style: [
+    {
+      selector: 'node',
+      style: {
+        'shape': 'round-rectangle',
+        'width': 220,
+        'height': 80,
+        'background-color': function(ele) { return PHASE[ele.data('phase')].bg; },
+        'border-width': 2,
+        'border-color': function(ele) { return PHASE[ele.data('phase')].color; },
+        'border-opacity': 0.6,
+        'label': function(ele) { return ele.data('lecture') + '  ' + ele.data('label'); },
+        'text-wrap': 'wrap',
+        'text-max-width': '200px',
+        'font-size': '11px',
+        'font-weight': 600,
+        'color': '#e0e6f0',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-outline-width': 0,
+        'overlay-padding': 6,
+        'transition-property': 'border-color, border-width, opacity, background-color',
+        'transition-duration': '0.25s'
+      }
+    },
+    {
+      selector: 'edge',
+      style: {
+        'width': 1.8,
+        'line-color': function(ele) {
+          if (ele.data('cross') === 'yes') return '#4b5563';
+          return PHASE[ele.source().data('phase')].color;
+        },
+        'target-arrow-color': function(ele) {
+          if (ele.data('cross') === 'yes') return '#4b5563';
+          return PHASE[ele.source().data('phase')].color;
+        },
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 1.2,
+        'curve-style': 'bezier',
+        'opacity': 0.45,
+        'label': function(ele) { return ele.data('label') || ''; },
+        'font-size': '9px',
+        'color': '#6b7994',
+        'text-rotation': 'autorotate',
+        'text-margin-y': -8,
+        'text-outline-width': 2,
+        'text-outline-color': '#0a0e1a',
+        'line-style': function(ele) {
+          return ele.data('cross') === 'yes' ? 'dashed' : 'solid';
+        },
+        'transition-property': 'opacity, width',
+        'transition-duration': '0.25s'
+      }
+    },
+    { selector: 'node.highlighted', style: { 'border-width': 3, 'border-opacity': 1, 'z-index': 20 } },
+    { selector: 'node.selected-node', style: {
+        'border-width': 4, 'border-opacity': 1,
+        'background-color': function(ele) { return PHASE[ele.data('phase')].color; },
+        'background-opacity': 0.3, 'z-index': 30
+    }},
+    { selector: 'node.dimmed', style: { 'opacity': 0.15 } },
+    { selector: 'edge.highlighted', style: { 'opacity': 0.9, 'width': 2.8, 'z-index': 10 } },
+    { selector: 'edge.dimmed', style: { 'opacity': 0.06 } }
+  ],
+  layout: { name: 'preset' },
+  minZoom: 0.2,
+  maxZoom: 2.5,
+  wheelSensitivity: 0.3
+});
+
+cy.fit(undefined, 60);
+
+// ============================================================
+//  DETAIL PANEL (BILINGUAL)
+// ============================================================
+var panel = document.getElementById('panel');
+var panelContent = document.getElementById('panelContent');
+
+function openPanel(id) {
+  var d = DATA[id];
+  if (!d) return;
+  var ph = PHASE[d.phase];
+
+  cy.elements().forEach(function(ele) { ele.removeClass('highlighted selected-node dimmed'); });
+  var node = cy.getElementById(id);
+  var neighborhood = node.neighborhood();
+  cy.elements().addClass('dimmed');
+  neighborhood.removeClass('dimmed').addClass('highlighted');
+  neighborhood.edges().addClass('highlighted');
+  node.removeClass('dimmed').addClass('selected-node');
+
+  var html = '';
+  html += '<div class="panel-lecture" style="color:' + ph.color + '">' + d.lecture + ' \u2014 ' + ph.label + ' ' + ph.labelCn + '</div>';
+  html += '<div class="panel-title" style="background:linear-gradient(135deg,' + ph.color + ',#e0e6f0);-webkit-background-clip:text;-webkit-text-fill-color:transparent">' + d.title + '</div>';
+  html += '<div class="panel-title-cn">' + d.titleCn + '</div>';
+  html += '<div class="panel-sub">' + d.sub + '</div>';
+  html += '<div class="panel-sub-cn">' + d.subCn + '</div>';
+
+  if (d.formulas && d.formulas.length) {
+    html += '<div class="section"><h3>Core Formulas \u6838\u5fc3\u516c\u5f0f</h3>';
+    for (var i = 0; i < d.formulas.length; i++) {
+      html += '<div class="formula-box">' + d.formulas[i] + '</div>';
+    }
+    html += '</div>';
+  }
+
+  if (d.points && d.points.length) {
+    html += '<div class="section"><h3>Key Points \u8981\u70b9</h3><ul>';
+    for (var i = 0; i < d.points.length; i++) {
+      var p = d.points[i];
+      if (Array.isArray(p)) {
+        html += '<li>' + p[0] + '<span class="cn">' + p[1] + '</span></li>';
+      } else {
+        html += '<li>' + p + '</li>';
+      }
+    }
+    html += '</ul></div>';
+  }
+
+  var conns = [];
+  edges.forEach(function(e) {
+    if (e.data.source === id && DATA[e.data.target]) {
+      conns.push({ id: e.data.target, dir: '\u2192', title: DATA[e.data.target].title, titleCn: DATA[e.data.target].titleCn });
+    }
+    if (e.data.target === id && DATA[e.data.source]) {
+      conns.push({ id: e.data.source, dir: '\u2190', title: DATA[e.data.source].title, titleCn: DATA[e.data.source].titleCn });
+    }
+  });
+  if (conns.length) {
+    html += '<div class="section"><h3>Connections \u5173\u8054 (' + conns.length + ')</h3><div class="conn-tags">';
+    for (var i = 0; i < conns.length; i++) {
+      html += '<span class="conn-tag" data-goto="' + conns[i].id + '">' + conns[i].dir + ' ' + conns[i].title + ' ' + conns[i].titleCn + '</span>';
+    }
+    html += '</div></div>';
+  }
+
+  if (d.tags && d.tags.length) {
+    html += '<div class="section"><h3>Keywords \u5173\u952e\u8bcd</h3><div class="conn-tags">';
+    for (var i = 0; i < d.tags.length; i++) {
+      html += '<span class="conn-tag" style="cursor:default">' + d.tags[i] + '</span>';
+    }
+    html += '</div></div>';
+  }
+
+  panelContent.innerHTML = html;
+  panel.classList.add('open');
+
+  var tags = panelContent.querySelectorAll('.conn-tag[data-goto]');
+  for (var i = 0; i < tags.length; i++) {
+    tags[i].addEventListener('click', function() {
+      var target = this.getAttribute('data-goto');
+      cy.animate({ center: { eles: cy.getElementById(target) }, duration: 400 });
+      setTimeout(function() { openPanel(target); }, 200);
+    });
+  }
+}
+
+function closePanel() {
+  panel.classList.remove('open');
+  cy.elements().forEach(function(ele) { ele.removeClass('highlighted selected-node dimmed'); });
+}
+
+cy.on('tap', 'node', function(evt) { openPanel(evt.target.id()); });
+cy.on('tap', function(evt) { if (evt.target === cy) closePanel(); });
+document.getElementById('panelClose').addEventListener('click', closePanel);
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closePanel(); });
+
+// ============================================================
+//  ZOOM CONTROLS
+// ============================================================
+document.getElementById('zoomIn').addEventListener('click', function() {
+  cy.zoom({ level: cy.zoom() * 1.3, renderedPosition: { x: cy.width()/2, y: cy.height()/2 } });
+});
+document.getElementById('zoomOut').addEventListener('click', function() {
+  cy.zoom({ level: cy.zoom() / 1.3, renderedPosition: { x: cy.width()/2, y: cy.height()/2 } });
+});
+document.getElementById('zoomFit').addEventListener('click', function() {
+  cy.animate({ fit: { padding: 60 }, duration: 400 });
+});
+
+// ============================================================
+//  HOVER
+// ============================================================
+cy.on('mouseover', 'node', function(evt) {
+  evt.target.style('border-width', 3);
+  document.getElementById('cy').style.cursor = 'pointer';
+});
+cy.on('mouseout', 'node', function(evt) {
+  if (!evt.target.hasClass('selected-node')) evt.target.style('border-width', 2);
+  document.getElementById('cy').style.cursor = 'default';
+});
+</script>
+</body>
+</html>
